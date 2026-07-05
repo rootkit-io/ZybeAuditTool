@@ -31,5 +31,18 @@ describe("normalizeWebsiteUrl", () => {
     expect(normalizeWebsiteUrl("http://127.0.0.1").ok).toBe(false);
     expect(normalizeWebsiteUrl("http://10.0.0.1").ok).toBe(false);
     expect(normalizeWebsiteUrl("http://192.168.1.1").ok).toBe(false);
+    expect(normalizeWebsiteUrl("http://172.16.0.1").ok).toBe(false);
+    expect(normalizeWebsiteUrl("http://169.254.10.20").ok).toBe(false);
+    expect(normalizeWebsiteUrl("http://2130706433").ok).toBe(false);
+    expect(normalizeWebsiteUrl("http://[::1]").ok).toBe(false);
+    expect(normalizeWebsiteUrl("http://[::ffff:7f00:1]").ok).toBe(false);
+    expect(normalizeWebsiteUrl("http://[fe90::1]").ok).toBe(false);
+  });
+
+  it("rejects internal-looking hostnames", () => {
+    expect(normalizeWebsiteUrl("https://intranet").ok).toBe(false);
+    expect(normalizeWebsiteUrl("https://example.local").ok).toBe(false);
+    expect(normalizeWebsiteUrl("https://example.lan").ok).toBe(false);
+    expect(normalizeWebsiteUrl("https://foo_bar.com").ok).toBe(false);
   });
 });

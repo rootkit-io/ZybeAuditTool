@@ -6,14 +6,28 @@ import { normalizeWebsiteUrl } from "@/lib/audits/url";
 import { startAuditSchema } from "@/lib/audits/validation";
 import { createAuditRequest } from "@/lib/audits/repository";
 import { apiError, validationError } from "@/lib/api/responses";
+import { validateServerEnv } from "@/lib/env";
 
 export async function POST(request: Request) {
-  const ip = getClientIp(request.headers);
-  const ipHash = hashIp(ip);
+  let ipHash: string;
+
+  try {
+    validateServerEnv();
+    ipHash = hashIp(getClientIp(request.headers));
+  } catch (error) {
+    console.error("server_env_invalid", {
+      error: error instanceof Error ? error.message : "unknown"
+    });
+
+    return apiError("Server configuration error", 500, "SERVER_CONFIG_ERROR");
+  }
+
   const rateLimit = checkRateLimit(`audit:start:${ipHash}`, 8, 60_000);
 
   if (!rateLimit.ok) {
-    return apiError("Too many audit attempts. Try again in a minute.", 429);
+    return apiError("Too many audit attempts. Try again in a minute.", 429, "RATE_LIMITED", {
+      "Retry-After": String(rateLimit.retryAfterSeconds)
+    });
   }
 
   const body = await request.json().catch(() => null);

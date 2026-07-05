@@ -33,6 +33,7 @@ model Lead {
 
 model AuditRequest {
   id               String             @id @default(cuid())
+  reportToken      String             @unique @default(cuid())
   websiteUrl       String
   normalizedDomain String
   leadId           String?

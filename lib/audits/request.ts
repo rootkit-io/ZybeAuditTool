@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { getIpHashSalt } from "@/lib/env";
 
 export function getClientIp(headers: Headers) {
   const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
@@ -8,7 +9,7 @@ export function getClientIp(headers: Headers) {
 }
 
 export function hashIp(ip: string) {
-  const salt = process.env.IP_HASH_SALT || "zybe-audit-tool-dev";
+  const salt = getIpHashSalt();
 
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex");
 }

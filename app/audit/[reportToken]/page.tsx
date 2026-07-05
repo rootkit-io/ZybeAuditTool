@@ -1,20 +1,20 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarDays, ExternalLink, PhoneCall } from "lucide-react";
-import { getAuditReport } from "@/lib/audits/repository";
+import { getAuditReportByToken } from "@/lib/audits/repository";
 import type { AuditReport } from "@/lib/audits/types";
 
 type PageProps = {
   params: Promise<{
-    auditRequestId: string;
+    reportToken: string;
   }>;
 };
 
 export default async function AuditReportPage({ params }: PageProps) {
-  const { auditRequestId } = await params;
-  const audit = await getAuditReport(auditRequestId);
+  const { reportToken } = await params;
+  const audit = await getAuditReportByToken(reportToken);
 
-  if (!audit?.reportJson) {
+  if (!audit?.reportJson || audit.status !== "report_ready") {
     notFound();
   }
 

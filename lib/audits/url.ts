@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isIP } from "node:net";
 
 const blockedHostnames = new Set(["localhost", "localhost.localdomain"]);
 
@@ -46,7 +47,7 @@ export function normalizeWebsiteUrl(input: string):
 
   const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
 
-  if (!hostname || isBlockedHostname(hostname) || isPrivateOrInternalIp(hostname)) {
+  if (!hostname || isBlockedHostname(hostname) || isPrivateOrInternalIp(hostname) || !isValidPublicHostname(hostname)) {
     return { ok: false, error: "Local, private, or internal URLs are not allowed" };
   }
 
@@ -69,7 +70,15 @@ export function isBlockedHostname(hostname: string) {
     return true;
   }
 
-  return hostname.endsWith(".localhost") || hostname.endsWith(".local") || hostname.endsWith(".internal");
+  return (
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal") ||
+    hostname.endsWith(".lan") ||
+    hostname.endsWith(".home.arpa") ||
+    hostname.endsWith(".invalid") ||
+    hostname.endsWith(".test")
+  );
 }
 
 export function stripWww(hostname: string) {
@@ -78,6 +87,11 @@ export function stripWww(hostname: string) {
 
 export function isPrivateOrInternalIp(hostname: string) {
   const normalized = hostname.replace(/^\[|\]$/g, "");
+  const version = isIP(normalized);
+
+  if (version === 0) {
+    return false;
+  }
 
   if (isPrivateIpv4(normalized)) {
     return true;
@@ -124,18 +138,69 @@ function isPrivateIpv4(value: string) {
 function isPrivateIpv6(value: string) {
   const lower = value.toLowerCase();
 
-  if (!lower.includes(":")) {
+  if (isIP(lower) !== 6) {
     return false;
   }
+
+  const mappedIpv4 = extractIpv4MappedIpv6(lower);
+
+  if (mappedIpv4) {
+    return isPrivateIpv4(mappedIpv4);
+  }
+
+  const firstHextet = parseInt(lower.split(":")[0] || "0", 16);
 
   return (
     lower === "::1" ||
     lower === "::" ||
-    lower.startsWith("fc") ||
-    lower.startsWith("fd") ||
-    lower.startsWith("fe80:") ||
-    lower.startsWith("::ffff:127.") ||
-    lower.startsWith("::ffff:10.") ||
-    lower.startsWith("::ffff:192.168.")
+    firstHextet === 0 ||
+    (firstHextet & 0xfe00) === 0xfc00 ||
+    (firstHextet & 0xffc0) === 0xfe80 ||
+    (firstHextet & 0xff00) === 0xff00 ||
+    lower === "2001:db8::" ||
+    lower.startsWith("2001:db8:") ||
+    lower === "2001:2::" ||
+    lower.startsWith("2001:2:") ||
+    lower === "64:ff9b:1::" ||
+    lower.startsWith("64:ff9b:1:")
   );
+}
+
+function extractIpv4MappedIpv6(value: string) {
+  if (!value.startsWith("::ffff:")) {
+    return null;
+  }
+
+  const tail = value.slice("::ffff:".length);
+
+  if (tail.includes(".")) {
+    return tail;
+  }
+
+  const hextets = tail.split(":");
+
+  if (hextets.length !== 2 || hextets.some((hextet) => !/^[0-9a-f]{1,4}$/.test(hextet))) {
+    return null;
+  }
+
+  const high = parseInt(hextets[0], 16);
+  const low = parseInt(hextets[1], 16);
+
+  return [high >> 8, high & 255, low >> 8, low & 255].join(".");
+}
+
+function isValidPublicHostname(hostname: string) {
+  const normalized = hostname.replace(/^\[|\]$/g, "");
+
+  if (isIP(normalized) !== 0) {
+    return true;
+  }
+
+  if (hostname.length > 253 || !hostname.includes(".")) {
+    return false;
+  }
+
+  return hostname.split(".").every((label) => {
+    return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label);
+  });
 }

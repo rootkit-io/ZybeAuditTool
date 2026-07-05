@@ -33,50 +33,70 @@ export async function createAuditRequest(input: CreateAuditRequestInput) {
     },
     select: {
       id: true,
+      reportToken: true,
       previewJson: true
     }
   });
 }
 
 export async function attachLeadAndReport(input: AttachLeadInput) {
-  const lead = await prisma.lead.upsert({
-    where: { email: input.email.toLowerCase() },
-    create: {
-      email: input.email.toLowerCase(),
-      name: emptyToNull(input.name),
-      company: emptyToNull(input.company),
-      phone: emptyToNull(input.phone),
-      consentToContact: input.consentToContact,
-      source: "website_audit_tool"
-    },
-    update: {
-      name: emptyToNull(input.name),
-      company: emptyToNull(input.company),
-      phone: emptyToNull(input.phone),
-      consentToContact: input.consentToContact
-    },
-    select: { id: true }
-  });
+  return prisma.$transaction(async (tx) => {
+    const lead = await tx.lead.upsert({
+      where: { email: input.email },
+      create: {
+        email: input.email,
+        name: emptyToNull(input.name),
+        company: emptyToNull(input.company),
+        phone: emptyToNull(input.phone),
+        consentToContact: input.consentToContact,
+        source: "website_audit_tool"
+      },
+      update: {
+        name: emptyToNull(input.name),
+        company: emptyToNull(input.company),
+        phone: emptyToNull(input.phone),
+        consentToContact: input.consentToContact
+      },
+      select: { id: true }
+    });
 
-  return prisma.auditRequest.update({
-    where: { id: input.auditRequestId },
-    data: {
-      leadId: lead.id,
-      status: "report_ready",
-      overallScore: input.report.overallScore,
-      reportJson: input.report
-    },
+    return tx.auditRequest.update({
+      where: { id: input.auditRequestId },
+      data: {
+        leadId: lead.id,
+        status: "report_ready",
+        overallScore: input.report.overallScore,
+        reportJson: input.report
+      },
+      select: {
+        id: true,
+        reportToken: true,
+        reportJson: true,
+        normalizedDomain: true
+      }
+    });
+  });
+}
+
+export async function getAuditRequestById(auditRequestId: string) {
+  return prisma.auditRequest.findUnique({
+    where: { id: auditRequestId },
     select: {
       id: true,
+      reportToken: true,
+      websiteUrl: true,
+      normalizedDomain: true,
+      status: true,
+      overallScore: true,
       reportJson: true,
-      normalizedDomain: true
+      createdAt: true
     }
   });
 }
 
-export async function getAuditReport(auditRequestId: string) {
+export async function getAuditReportByToken(reportToken: string) {
   return prisma.auditRequest.findUnique({
-    where: { id: auditRequestId },
+    where: { reportToken },
     select: {
       id: true,
       websiteUrl: true,

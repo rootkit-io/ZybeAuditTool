@@ -1,18 +1,33 @@
 import { NextResponse } from "next/server";
 import { apiError, validationError } from "@/lib/api/responses";
-import { attachLeadAndReport, getAuditReport } from "@/lib/audits/repository";
+import { attachLeadAndReport, getAuditRequestById } from "@/lib/audits/repository";
 import { checkRateLimit } from "@/lib/audits/rate-limit";
 import { getClientIp, hashIp } from "@/lib/audits/request";
 import { generateAuditReport } from "@/lib/audits/scoring";
 import { normalizeWebsiteUrl } from "@/lib/audits/url";
 import { submitEmailSchema } from "@/lib/audits/validation";
+import { validateServerEnv } from "@/lib/env";
 
 export async function POST(request: Request) {
-  const ipHash = hashIp(getClientIp(request.headers));
+  let ipHash: string;
+
+  try {
+    validateServerEnv();
+    ipHash = hashIp(getClientIp(request.headers));
+  } catch (error) {
+    console.error("server_env_invalid", {
+      error: error instanceof Error ? error.message : "unknown"
+    });
+
+    return apiError("Server configuration error", 500, "SERVER_CONFIG_ERROR");
+  }
+
   const rateLimit = checkRateLimit(`audit:email:${ipHash}`, 6, 60_000);
 
   if (!rateLimit.ok) {
-    return apiError("Too many email submissions. Try again in a minute.", 429);
+    return apiError("Too many email submissions. Try again in a minute.", 429, "RATE_LIMITED", {
+      "Retry-After": String(rateLimit.retryAfterSeconds)
+    });
   }
 
   const body = await request.json().catch(() => null);
@@ -23,16 +38,23 @@ export async function POST(request: Request) {
   }
 
   try {
-    const existing = await getAuditReport(parsed.data.auditRequestId);
+    const existing = await getAuditRequestById(parsed.data.auditRequestId);
 
     if (!existing) {
-      return apiError("Audit request not found", 404);
+      return apiError("Audit request not found", 404, "AUDIT_NOT_FOUND");
+    }
+
+    if (existing.status === "report_ready" && existing.reportJson) {
+      return NextResponse.json({
+        reportUrl: `/audit/${existing.reportToken}`,
+        report: existing.reportJson
+      });
     }
 
     const normalized = normalizeWebsiteUrl(existing.websiteUrl);
 
     if (!normalized.ok) {
-      return apiError("Stored audit URL is no longer valid", 500);
+      return apiError("Stored audit URL is no longer valid", 500, "STORED_URL_INVALID");
     }
 
     const report = generateAuditReport(normalized.value);
@@ -47,7 +69,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
-      reportUrl: `/audit/${auditRequest.id}`,
+      reportUrl: `/audit/${auditRequest.reportToken}`,
       report
     });
   } catch (error) {
