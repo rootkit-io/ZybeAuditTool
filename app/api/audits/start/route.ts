@@ -7,6 +7,7 @@ import { startAuditSchema } from "@/lib/audits/validation";
 import { createAuditRequest } from "@/lib/audits/repository";
 import { apiError, validationError } from "@/lib/api/responses";
 import { validateServerEnv } from "@/lib/env";
+import { safeFetchHomepage } from "@/lib/audits/safe-fetch";
 
 export async function POST(request: Request) {
   let ipHash: string;
@@ -43,9 +44,9 @@ export async function POST(request: Request) {
     return apiError(normalized.error, 400);
   }
 
-  const preview = generateAuditPreview(normalized.value);
-
   try {
+    const observedSignals = await safeFetchHomepage(normalized.value.websiteUrl);
+    const preview = generateAuditPreview(normalized.value, observedSignals);
     const auditRequest = await createAuditRequest({
       ...normalized.value,
       overallScore: preview.overallScore,

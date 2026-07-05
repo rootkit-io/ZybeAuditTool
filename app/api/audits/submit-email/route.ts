@@ -4,6 +4,7 @@ import { attachLeadAndReport, getAuditRequestById } from "@/lib/audits/repositor
 import { checkRateLimit } from "@/lib/audits/rate-limit";
 import { getClientIp, hashIp } from "@/lib/audits/request";
 import { generateAuditReport } from "@/lib/audits/scoring";
+import type { AuditPreview } from "@/lib/audits/types";
 import { normalizeWebsiteUrl } from "@/lib/audits/url";
 import { submitEmailSchema } from "@/lib/audits/validation";
 import { validateServerEnv } from "@/lib/env";
@@ -57,7 +58,8 @@ export async function POST(request: Request) {
       return apiError("Stored audit URL is no longer valid", 500, "STORED_URL_INVALID");
     }
 
-    const report = generateAuditReport(normalized.value);
+    const preview = existing.previewJson as AuditPreview | null;
+    const report = generateAuditReport(normalized.value, preview?.observedSignals);
     const auditRequest = await attachLeadAndReport({
       auditRequestId: parsed.data.auditRequestId,
       email: parsed.data.email,

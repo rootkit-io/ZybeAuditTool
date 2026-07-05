@@ -88,6 +88,7 @@ export async function getAuditRequestById(auditRequestId: string) {
       normalizedDomain: true,
       status: true,
       overallScore: true,
+      previewJson: true,
       reportJson: true,
       createdAt: true
     }

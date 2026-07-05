@@ -1,6 +1,36 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearRateLimitForTests } from "@/lib/audits/rate-limit";
 
+vi.mock("@/lib/audits/safe-fetch", () => ({
+  safeFetchHomepage: vi.fn(async () => ({
+    fetchStatus: "success",
+    reachable: true,
+    requestedUrl: "https://example.com/",
+    finalUrl: "https://example.com/",
+    statusCode: 200,
+    redirected: false,
+    redirectCount: 0,
+    htmlSizeBytes: 5000,
+    htmlSizeLimitBytes: 256000,
+    contentType: "text/html",
+    titleExists: true,
+    titleLength: 12,
+    metaDescriptionExists: true,
+    metaDescriptionLength: 40,
+    h1Exists: true,
+    headingCounts: { h1: 1, h2: 2, h3: 0, h4: 0, h5: 0, h6: 0 },
+    internalLinkCount: 4,
+    externalLinkCount: 1,
+    contactLinkDetected: true,
+    ctaKeywordDetected: true,
+    formDetected: true,
+    socialLinkDetected: true,
+    robotsTxtAvailable: true,
+    sitemapXmlAvailable: true,
+    checkedAt: "2026-07-05T00:00:00.000Z"
+  }))
+}));
+
 vi.mock("@/lib/audits/repository", () => ({
   createAuditRequest: vi.fn(async (input) => ({
     id: "audit_12345678",
@@ -14,6 +44,25 @@ vi.mock("@/lib/audits/repository", () => ({
     normalizedDomain: "example.com",
     status: "preview_created",
     overallScore: 78,
+    previewJson: {
+      observedSignals: {
+        fetchStatus: "success",
+        reachable: true,
+        requestedUrl: "https://example.com/",
+        finalUrl: "https://example.com/",
+        statusCode: 200,
+        redirected: false,
+        redirectCount: 0,
+        htmlSizeLimitBytes: 256000,
+        titleExists: true,
+        metaDescriptionExists: true,
+        h1Exists: true,
+        contactLinkDetected: true,
+        ctaKeywordDetected: true,
+        formDetected: true,
+        checkedAt: "2026-07-05T00:00:00.000Z"
+      }
+    },
     reportJson: null,
     createdAt: new Date()
   })),
@@ -45,6 +94,37 @@ describe("audit API routes", () => {
     expect(response.status).toBe(201);
     expect(data.auditRequestId).toBe("audit_12345678");
     expect(data.preview.normalizedDomain).toBe("example.com");
+    expect(data.preview.observedSignals.fetchStatus).toBe("success");
+  });
+
+  it("still creates fallback preview when homepage fetch fails", async () => {
+    const { safeFetchHomepage } = await import("@/lib/audits/safe-fetch");
+    vi.mocked(safeFetchHomepage).mockResolvedValueOnce({
+      fetchStatus: "failed",
+      reachable: false,
+      requestedUrl: "https://example.com/",
+      redirected: false,
+      redirectCount: 0,
+      htmlSizeLimitBytes: 256000,
+      failureReason: "timeout",
+      checkedAt: "2026-07-05T00:00:00.000Z"
+    });
+
+    const { POST } = await import("@/app/api/audits/start/route");
+    const response = await POST(
+      new Request("http://test.local/api/audits/start", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.14" },
+        body: JSON.stringify({ websiteUrl: "https://example.com" })
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(data.preview.observedSignals).toMatchObject({
+      fetchStatus: "failed",
+      failureReason: "timeout"
+    });
   });
 
   it("rejects invalid start URLs", async () => {
@@ -128,5 +208,6 @@ describe("audit API routes", () => {
     expect(response.status).toBe(200);
     expect(data.reportUrl).toBe("/audit/report_public_token");
     expect(data.report.normalizedDomain).toBe("example.com");
+    expect(data.report.observedSignals.fetchStatus).toBe("success");
   });
 });
