@@ -8,6 +8,7 @@ import { createAuditRequest } from "@/lib/audits/repository";
 import { apiError, validationError } from "@/lib/api/responses";
 import { validateServerEnv } from "@/lib/env";
 import { safeFetchHomepage } from "@/lib/audits/safe-fetch";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 export async function POST(request: Request) {
   let ipHash: string;
@@ -23,7 +24,9 @@ export async function POST(request: Request) {
     return apiError("Server configuration error", 500, "SERVER_CONFIG_ERROR");
   }
 
-  const rateLimit = checkRateLimit(`audit:start:${ipHash}`, 8, 60_000);
+  trackAnalyticsEvent("audit_started", { ipHash });
+
+  const rateLimit = await checkRateLimit(`audit:start:${ipHash}`, 8, 60_000);
 
   if (!rateLimit.ok) {
     return apiError("Too many audit attempts. Try again in a minute.", 429, "RATE_LIMITED", {
@@ -53,6 +56,13 @@ export async function POST(request: Request) {
       preview,
       ipHash,
       userAgent: safeUserAgent(request.headers)
+    });
+
+    trackAnalyticsEvent("audit_preview_created", {
+      auditRequestId: auditRequest.id,
+      normalizedDomain: normalized.value.normalizedDomain,
+      score: preview.overallScore,
+      fetchStatus: observedSignals.fetchStatus
     });
 
     return NextResponse.json(

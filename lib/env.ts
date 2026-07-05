@@ -3,97 +3,86 @@ import { z } from "zod";
 const optionalNonEmptyString = (message: string) =>
   z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1, message).optional());
 
+const optionalUrl = (message: string) =>
+  z.preprocess((value) => (value === "" ? undefined : value), z.string().url(message).optional());
+
 const serverEnvSchema = z
   .object({
     NODE_ENV: z.string().optional(),
-    DATABASE_URL: z.string().min(1, "DATABASE_URL is required").optional(),
-    DIRECT_URL: z.string().min(1, "DIRECT_URL is required for Prisma migrations").optional(),
-    IP_HASH_SALT: z.string().min(24, "IP_HASH_SALT must be at least 24 characters").optional(),
+    DATABASE_URL: optionalNonEmptyString("DATABASE_URL is required"),
+    DIRECT_URL: optionalNonEmptyString("DIRECT_URL is required for Prisma migrations"),
+    IP_HASH_SALT: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.string().min(24, "IP_HASH_SALT must be at least 24 characters").optional()
+    ),
+    APP_BASE_URL: optionalUrl("APP_BASE_URL must be a valid URL"),
+    BOOKING_URL: optionalUrl("BOOKING_URL must be a valid URL"),
+    CONTACT_EMAIL: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.string().email("CONTACT_EMAIL must be a valid email").optional()
+    ),
+    CONTACT_URL: optionalUrl("CONTACT_URL must be a valid URL"),
     AI_REPORT_PROVIDER: z.preprocess((value) => (value === "" ? undefined : value), z.enum(["openai"]).optional()),
     OPENAI_API_KEY: optionalNonEmptyString("OPENAI_API_KEY is required when AI_REPORT_PROVIDER=openai"),
     OPENAI_MODEL: optionalNonEmptyString("OPENAI_MODEL is required when AI_REPORT_PROVIDER=openai"),
-    OPENAI_BASE_URL: z.preprocess(
-      (value) => (value === "" ? undefined : value),
-      z.string().url("OPENAI_BASE_URL must be a valid URL").optional()
-    ),
+    OPENAI_BASE_URL: optionalUrl("OPENAI_BASE_URL must be a valid URL"),
     RESEND_API_KEY: optionalNonEmptyString("RESEND_API_KEY is required for email delivery"),
     FROM_EMAIL: optionalNonEmptyString("FROM_EMAIL is required for email delivery"),
     INTERNAL_LEAD_NOTIFY_EMAIL: optionalNonEmptyString("INTERNAL_LEAD_NOTIFY_EMAIL is required for email delivery"),
-    APP_BASE_URL: z.preprocess(
-      (value) => (value === "" ? undefined : value),
-      z.string().url("APP_BASE_URL must be a valid URL").optional()
-    )
+    UPSTASH_REDIS_REST_URL: optionalUrl("UPSTASH_REDIS_REST_URL must be a valid URL"),
+    UPSTASH_REDIS_REST_TOKEN: optionalNonEmptyString("UPSTASH_REDIS_REST_TOKEN is required when UPSTASH_REDIS_REST_URL is set")
   })
   .superRefine((env, ctx) => {
-    if (env.NODE_ENV === "production" && !env.DATABASE_URL) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["DATABASE_URL"],
-        message: "DATABASE_URL is required in production"
-      });
+    if (env.NODE_ENV === "production") {
+      requireField(ctx, env.DATABASE_URL, "DATABASE_URL", "DATABASE_URL is required in production");
+      requireField(ctx, env.DIRECT_URL, "DIRECT_URL", "DIRECT_URL is required in production");
+      requireField(ctx, env.IP_HASH_SALT, "IP_HASH_SALT", "IP_HASH_SALT is required in production");
+      requireField(ctx, env.APP_BASE_URL, "APP_BASE_URL", "APP_BASE_URL is required in production");
+      requireField(ctx, env.BOOKING_URL, "BOOKING_URL", "BOOKING_URL is required in production");
+
+      if (!env.CONTACT_EMAIL && !env.CONTACT_URL) {
+        requireField(ctx, undefined, "CONTACT_EMAIL", "CONTACT_EMAIL or CONTACT_URL is required in production");
+      }
     }
 
-    if (env.NODE_ENV === "production" && !env.IP_HASH_SALT) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["IP_HASH_SALT"],
-        message: "IP_HASH_SALT is required in production"
-      });
-    }
-
-    if (env.AI_REPORT_PROVIDER === "openai" && !env.OPENAI_API_KEY) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["OPENAI_API_KEY"],
-        message: "OPENAI_API_KEY is required when AI_REPORT_PROVIDER=openai"
-      });
-    }
-
-    if (env.AI_REPORT_PROVIDER === "openai" && !env.OPENAI_MODEL) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["OPENAI_MODEL"],
-        message: "OPENAI_MODEL is required when AI_REPORT_PROVIDER=openai"
-      });
+    if (env.AI_REPORT_PROVIDER === "openai") {
+      requireField(ctx, env.OPENAI_API_KEY, "OPENAI_API_KEY", "OPENAI_API_KEY is required when AI_REPORT_PROVIDER=openai");
+      requireField(ctx, env.OPENAI_MODEL, "OPENAI_MODEL", "OPENAI_MODEL is required when AI_REPORT_PROVIDER=openai");
     }
 
     const anyEmailEnv =
       Boolean(env.RESEND_API_KEY) ||
       Boolean(env.FROM_EMAIL) ||
-      Boolean(env.INTERNAL_LEAD_NOTIFY_EMAIL) ||
-      Boolean(env.APP_BASE_URL);
-    const requireEmailEnv = anyEmailEnv;
+      Boolean(env.INTERNAL_LEAD_NOTIFY_EMAIL);
 
-    if (requireEmailEnv && !env.RESEND_API_KEY) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["RESEND_API_KEY"],
-        message: "RESEND_API_KEY is required for email delivery"
-      });
+    if (anyEmailEnv) {
+      requireField(ctx, env.RESEND_API_KEY, "RESEND_API_KEY", "RESEND_API_KEY is required for email delivery");
+      requireField(ctx, env.FROM_EMAIL, "FROM_EMAIL", "FROM_EMAIL is required for email delivery");
+      requireField(
+        ctx,
+        env.INTERNAL_LEAD_NOTIFY_EMAIL,
+        "INTERNAL_LEAD_NOTIFY_EMAIL",
+        "INTERNAL_LEAD_NOTIFY_EMAIL is required for email delivery"
+      );
+      requireField(ctx, env.APP_BASE_URL, "APP_BASE_URL", "APP_BASE_URL is required for email delivery");
     }
 
-    if (requireEmailEnv && !env.FROM_EMAIL) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["FROM_EMAIL"],
-        message: "FROM_EMAIL is required for email delivery"
-      });
+    if (env.UPSTASH_REDIS_REST_URL && !env.UPSTASH_REDIS_REST_TOKEN) {
+      requireField(
+        ctx,
+        undefined,
+        "UPSTASH_REDIS_REST_TOKEN",
+        "UPSTASH_REDIS_REST_TOKEN is required when UPSTASH_REDIS_REST_URL is set"
+      );
     }
 
-    if (requireEmailEnv && !env.INTERNAL_LEAD_NOTIFY_EMAIL) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["INTERNAL_LEAD_NOTIFY_EMAIL"],
-        message: "INTERNAL_LEAD_NOTIFY_EMAIL is required for email delivery"
-      });
-    }
-
-    if (requireEmailEnv && !env.APP_BASE_URL) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["APP_BASE_URL"],
-        message: "APP_BASE_URL is required for email delivery"
-      });
+    if (env.UPSTASH_REDIS_REST_TOKEN && !env.UPSTASH_REDIS_REST_URL) {
+      requireField(
+        ctx,
+        undefined,
+        "UPSTASH_REDIS_REST_URL",
+        "UPSTASH_REDIS_REST_URL is required when UPSTASH_REDIS_REST_TOKEN is set"
+      );
     }
   });
 
@@ -133,4 +122,14 @@ export function getEmailConfig() {
   }
 
   return config;
+}
+
+function requireField(ctx: z.RefinementCtx, value: unknown, path: string, message: string) {
+  if (!value) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [path],
+      message
+    });
+  }
 }

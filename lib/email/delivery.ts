@@ -3,6 +3,7 @@ import type { EmailEventStatus, EmailEventType } from "@prisma/client";
 import type { AuditReport } from "@/lib/audits/types";
 import { createEmailEvent } from "@/lib/audits/repository";
 import { getEmailConfig } from "@/lib/env";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 import { buildInternalLeadNotificationEmail, buildUserReportEmail, type LeadContact } from "./templates";
 import { createEmailProviderFromEnv, type EmailProvider, type SendEmailResult } from "./provider";
 
@@ -107,6 +108,15 @@ async function recordDelivery(
       type,
       error: error instanceof Error ? error.message : "unknown"
     });
+  });
+
+  trackAnalyticsEvent(type === "user_report" ? "report_email_attempted" : "internal_email_attempted", {
+    auditRequestId: input.auditRequestId,
+    type,
+    status: result.status,
+    provider: result.provider,
+    recipientDomain: extractEmailDomain(recipient),
+    errorCode: result.errorCode
   });
 }
 

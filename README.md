@@ -96,6 +96,50 @@ The user email includes the audited website, overall score, top issues or quick 
 
 The internal notification includes submitted lead contact fields, website/domain, score, report link, top issues, and consent status. Raw homepage HTML is never included.
 
+## Phase 5 Launch Readiness
+
+Production-only checklist:
+
+1. Supabase
+   - Set `DATABASE_URL` to pooled Supabase Postgres URL.
+   - Set `DIRECT_URL` to direct Supabase Postgres URL.
+   - Run `npx prisma migrate deploy`.
+   - Confirm `npx prisma migrate status` says database schema is up to date.
+   - Keep RLS enabled and revokes applied for `leads`, `audit_requests`, `email_events`, and `_prisma_migrations`.
+
+2. App config
+   - Set `APP_BASE_URL` to the public deployed URL.
+   - Set `IP_HASH_SALT` to at least 24 random characters.
+   - Set `BOOKING_URL` to the live booking link.
+   - Set either `CONTACT_EMAIL` or `CONTACT_URL`.
+
+3. Optional OpenAI
+   - Set `AI_REPORT_PROVIDER=openai`.
+   - Set `OPENAI_API_KEY`.
+   - Set `OPENAI_MODEL`.
+   - Leave unset to use deterministic written fallback.
+
+4. Optional Resend
+   - Set `RESEND_API_KEY`.
+   - Set `FROM_EMAIL`.
+   - Set `INTERNAL_LEAD_NOTIFY_EMAIL`.
+   - Verify the sender/domain in Resend before launch.
+   - Send one real test report and confirm both user and internal emails arrive.
+
+5. Optional persistent rate limiting
+   - Set `UPSTASH_REDIS_REST_URL`.
+   - Set `UPSTASH_REDIS_REST_TOKEN`.
+   - If unset, the app uses in-memory rate limiting, fine for local dev and single-process smoke tests only.
+
+Smoke test:
+
+1. Submit a valid public website URL.
+2. Confirm preview appears.
+3. Submit email with consent.
+4. Confirm report opens with `/audit/{reportToken}`.
+5. Confirm `email_events` has user and internal delivery attempts.
+6. Confirm logs contain analytics event names but no raw email, phone, URL query strings, or raw HTML.
+
 ## Security Notes
 
 - Report URLs use a separate public token instead of the internal audit request ID.
@@ -105,4 +149,4 @@ The internal notification includes submitted lead contact fields, website/domain
 - Raw HTML is parsed in memory only and is not stored.
 - AI output is validated with Zod. If validation fails, or if the AI marks an invented issue as observed, the deterministic fallback is used.
 - Email delivery events store recipient hash and domain, not raw recipient emails.
-- Rate limiting is in-memory. Use Redis, Upstash, or another shared store before running multiple app instances.
+- Rate limiting uses Upstash Redis when configured and falls back to in-memory for local/dev.

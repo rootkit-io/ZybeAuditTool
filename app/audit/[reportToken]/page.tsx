@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { CalendarDays, ExternalLink, PhoneCall } from "lucide-react";
 import { getAuditReportByToken } from "@/lib/audits/repository";
 import type { AuditReport } from "@/lib/audits/types";
+import { getPublicAppConfig } from "@/lib/config";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 type PageProps = {
   params: Promise<{
@@ -19,6 +21,12 @@ export default async function AuditReportPage({ params }: PageProps) {
   }
 
   const report = audit.reportJson as AuditReport;
+  const appConfig = getPublicAppConfig();
+
+  trackAnalyticsEvent("report_viewed", {
+    normalizedDomain: report.normalizedDomain,
+    score: report.overallScore
+  });
 
   return (
     <main className="min-h-screen bg-background">
@@ -157,14 +165,14 @@ export default async function AuditReportPage({ params }: PageProps) {
             ) : null}
             <div className="mt-4 grid gap-2">
               <a
-                href="mailto:hello@zybesocial.com?subject=Website%20audit%20follow-up"
+                href={appConfig.contactHref}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <PhoneCall className="h-4 w-4" aria-hidden="true" />
-                Contact Zybe Social
+                {appConfig.contactLabel}
               </a>
               <a
-                href="https://cal.com/"
+                href={appConfig.bookingUrl}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <CalendarDays className="h-4 w-4" aria-hidden="true" />

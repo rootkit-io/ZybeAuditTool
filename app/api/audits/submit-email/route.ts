@@ -10,6 +10,7 @@ import { normalizeWebsiteUrl } from "@/lib/audits/url";
 import { submitEmailSchema } from "@/lib/audits/validation";
 import { validateServerEnv } from "@/lib/env";
 import { deliverAuditEmails } from "@/lib/email/delivery";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 export async function POST(request: Request) {
   let ipHash: string;
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
     return apiError("Server configuration error", 500, "SERVER_CONFIG_ERROR");
   }
 
-  const rateLimit = checkRateLimit(`audit:email:${ipHash}`, 6, 60_000);
+  const rateLimit = await checkRateLimit(`audit:email:${ipHash}`, 6, 60_000);
 
   if (!rateLimit.ok) {
     return apiError("Too many email submissions. Try again in a minute.", 429, "RATE_LIMITED", {
@@ -39,6 +40,11 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return validationError(parsed.error);
   }
+
+  trackAnalyticsEvent("email_submitted", {
+    auditRequestId: parsed.data.auditRequestId,
+    consentToContact: parsed.data.consentToContact
+  });
 
   try {
     const existing = await getAuditRequestById(parsed.data.auditRequestId);
@@ -63,6 +69,12 @@ export async function POST(request: Request) {
     const preview = existing.previewJson as AuditPreview | null;
     const deterministicReport = generateAuditReport(normalized.value, preview?.observedSignals);
     const report = await enhanceAuditReportWithAi(deterministicReport);
+    trackAnalyticsEvent("report_generated", {
+      auditRequestId: parsed.data.auditRequestId,
+      normalizedDomain: normalized.value.normalizedDomain,
+      score: report.overallScore,
+      aiReportSource: report.aiReportSource
+    });
     const auditRequest = await attachLeadAndReport({
       auditRequestId: parsed.data.auditRequestId,
       email: parsed.data.email,
