@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum AuditRequestStatus {
+  preview_created
+  email_submitted
+  report_ready
+  failed
+}
+
+model Lead {
+  id               String         @id @default(cuid())
+  email            String         @unique
+  name             String?
+  company          String?
+  phone            String?
+  consentToContact Boolean        @default(false)
+  source           String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  auditRequests    AuditRequest[]
+
+  @@index([email])
+  @@map("leads")
+}
+
+model AuditRequest {
+  id               String             @id @default(cuid())
+  websiteUrl       String
+  normalizedDomain String
+  leadId           String?
+  lead             Lead?              @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  status           AuditRequestStatus @default(preview_created)
+  overallScore     Int?
+  previewJson      Json
+  reportJson       Json?
+  ipHash           String?
+  userAgent        String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([normalizedDomain])
+  @@index([status])
+  @@index([createdAt])
+  @@index([leadId])
+  @@map("audit_requests")
+}
