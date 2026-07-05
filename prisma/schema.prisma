@@ -26,6 +26,7 @@ model Lead {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   auditRequests    AuditRequest[]
+  emailEvents      EmailEvent[]
 
   @@index([email])
   @@map("leads")
@@ -46,10 +47,45 @@ model AuditRequest {
   userAgent        String?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
+  emailEvents      EmailEvent[]
 
   @@index([normalizedDomain])
   @@index([status])
   @@index([createdAt])
   @@index([leadId])
   @@map("audit_requests")
+}
+
+enum EmailEventType {
+  user_report
+  internal_lead_notification
+}
+
+enum EmailEventStatus {
+  sent
+  failed
+  skipped
+}
+
+model EmailEvent {
+  id                  String           @id @default(cuid())
+  auditRequestId      String
+  auditRequest        AuditRequest     @relation(fields: [auditRequestId], references: [id], onDelete: Cascade)
+  leadId              String?
+  lead                Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  type                EmailEventType
+  status              EmailEventStatus
+  recipientEmailHash  String
+  recipientDomain     String?
+  provider            String
+  providerMessageId   String?
+  errorCode           String?
+  createdAt           DateTime         @default(now())
+
+  @@index([auditRequestId])
+  @@index([leadId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("email_events")
 }

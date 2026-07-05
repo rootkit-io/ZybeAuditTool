@@ -15,6 +15,13 @@ const serverEnvSchema = z
     OPENAI_BASE_URL: z.preprocess(
       (value) => (value === "" ? undefined : value),
       z.string().url("OPENAI_BASE_URL must be a valid URL").optional()
+    ),
+    RESEND_API_KEY: optionalNonEmptyString("RESEND_API_KEY is required for email delivery"),
+    FROM_EMAIL: optionalNonEmptyString("FROM_EMAIL is required for email delivery"),
+    INTERNAL_LEAD_NOTIFY_EMAIL: optionalNonEmptyString("INTERNAL_LEAD_NOTIFY_EMAIL is required for email delivery"),
+    APP_BASE_URL: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.string().url("APP_BASE_URL must be a valid URL").optional()
     )
   })
   .superRefine((env, ctx) => {
@@ -49,6 +56,45 @@ const serverEnvSchema = z
         message: "OPENAI_MODEL is required when AI_REPORT_PROVIDER=openai"
       });
     }
+
+    const anyEmailEnv =
+      Boolean(env.RESEND_API_KEY) ||
+      Boolean(env.FROM_EMAIL) ||
+      Boolean(env.INTERNAL_LEAD_NOTIFY_EMAIL) ||
+      Boolean(env.APP_BASE_URL);
+    const requireEmailEnv = anyEmailEnv;
+
+    if (requireEmailEnv && !env.RESEND_API_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["RESEND_API_KEY"],
+        message: "RESEND_API_KEY is required for email delivery"
+      });
+    }
+
+    if (requireEmailEnv && !env.FROM_EMAIL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["FROM_EMAIL"],
+        message: "FROM_EMAIL is required for email delivery"
+      });
+    }
+
+    if (requireEmailEnv && !env.INTERNAL_LEAD_NOTIFY_EMAIL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["INTERNAL_LEAD_NOTIFY_EMAIL"],
+        message: "INTERNAL_LEAD_NOTIFY_EMAIL is required for email delivery"
+      });
+    }
+
+    if (requireEmailEnv && !env.APP_BASE_URL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["APP_BASE_URL"],
+        message: "APP_BASE_URL is required for email delivery"
+      });
+    }
   });
 
 export function validateServerEnv() {
@@ -67,4 +113,24 @@ export function getIpHashSalt() {
   }
 
   return process.env.IP_HASH_SALT || "zybe-audit-tool-dev-only-salt";
+}
+
+export function getEmailConfig() {
+  const config = {
+    resendApiKey: process.env.RESEND_API_KEY || "",
+    fromEmail: process.env.FROM_EMAIL || "",
+    internalLeadNotifyEmail: process.env.INTERNAL_LEAD_NOTIFY_EMAIL || "",
+    appBaseUrl: process.env.APP_BASE_URL || ""
+  };
+
+  if (
+    !config.resendApiKey ||
+    !config.fromEmail ||
+    !config.internalLeadNotifyEmail ||
+    !config.appBaseUrl
+  ) {
+    return null;
+  }
+
+  return config;
 }

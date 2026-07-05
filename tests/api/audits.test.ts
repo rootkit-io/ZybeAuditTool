@@ -66,6 +66,10 @@ vi.mock("@/lib/audits/ai-report-service", () => ({
   }))
 }));
 
+vi.mock("@/lib/email/delivery", () => ({
+  deliverAuditEmails: vi.fn(async () => undefined)
+}));
+
 vi.mock("@/lib/audits/repository", () => ({
   createAuditRequest: vi.fn(async (input) => ({
     id: "audit_12345678",
@@ -245,5 +249,27 @@ describe("audit API routes", () => {
     expect(data.report.normalizedDomain).toBe("example.com");
     expect(data.report.observedSignals.fetchStatus).toBe("success");
     expect(data.report.aiReportSource).toBe("deterministic_fallback");
+  });
+
+  it("still returns report if email delivery fails", async () => {
+    const { deliverAuditEmails } = await import("@/lib/email/delivery");
+    vi.mocked(deliverAuditEmails).mockRejectedValueOnce(new Error("resend_down"));
+
+    const { POST } = await import("@/app/api/audits/submit-email/route");
+    const response = await POST(
+      new Request("http://test.local/api/audits/submit-email", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.15" },
+        body: JSON.stringify({
+          auditRequestId: "audit_12345678",
+          email: "person@example.com",
+          consentToContact: true
+        })
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.reportUrl).toBe("/audit/report_public_token");
   });
 });

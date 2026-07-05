@@ -9,6 +9,7 @@ import type { AuditPreview } from "@/lib/audits/types";
 import { normalizeWebsiteUrl } from "@/lib/audits/url";
 import { submitEmailSchema } from "@/lib/audits/validation";
 import { validateServerEnv } from "@/lib/env";
+import { deliverAuditEmails } from "@/lib/email/delivery";
 
 export async function POST(request: Request) {
   let ipHash: string;
@@ -70,6 +71,25 @@ export async function POST(request: Request) {
       phone: parsed.data.phone,
       consentToContact: parsed.data.consentToContact,
       report
+    });
+
+    await deliverAuditEmails({
+      auditRequestId: auditRequest.id,
+      leadId: auditRequest.leadId,
+      reportToken: auditRequest.reportToken,
+      report,
+      lead: {
+        email: parsed.data.email,
+        name: parsed.data.name,
+        company: parsed.data.company,
+        phone: parsed.data.phone,
+        consentToContact: parsed.data.consentToContact
+      }
+    }).catch((error) => {
+      console.error("audit_email_delivery_failed", {
+        auditRequestId: auditRequest.id,
+        error: error instanceof Error ? error.message : "unknown"
+      });
     });
 
     return NextResponse.json({

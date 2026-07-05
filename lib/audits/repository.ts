@@ -1,3 +1,4 @@
+import type { EmailEventStatus, EmailEventType } from "@prisma/client";
 import type { AuditPreview, AuditReport } from "./types";
 import { prisma } from "@/lib/prisma";
 
@@ -18,6 +19,18 @@ export type AttachLeadInput = {
   phone?: string;
   consentToContact: true;
   report: AuditReport;
+};
+
+export type CreateEmailEventInput = {
+  auditRequestId: string;
+  leadId?: string;
+  type: EmailEventType;
+  status: EmailEventStatus;
+  recipientEmailHash: string;
+  recipientDomain?: string;
+  provider: string;
+  providerMessageId?: string;
+  errorCode?: string;
 };
 
 export async function createAuditRequest(input: CreateAuditRequestInput) {
@@ -70,11 +83,29 @@ export async function attachLeadAndReport(input: AttachLeadInput) {
       },
       select: {
         id: true,
+        leadId: true,
         reportToken: true,
         reportJson: true,
         normalizedDomain: true
       }
     });
+  });
+}
+
+export async function createEmailEvent(input: CreateEmailEventInput) {
+  return prisma.emailEvent.create({
+    data: {
+      auditRequestId: input.auditRequestId,
+      leadId: input.leadId,
+      type: input.type,
+      status: input.status,
+      recipientEmailHash: input.recipientEmailHash,
+      recipientDomain: input.recipientDomain,
+      provider: input.provider,
+      providerMessageId: input.providerMessageId,
+      errorCode: input.errorCode
+    },
+    select: { id: true }
   });
 }
 

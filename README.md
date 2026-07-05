@@ -79,6 +79,23 @@ The AI prompt includes only:
 
 Raw HTML is never sent to the AI.
 
+## Phase 4 Email Delivery
+
+Email delivery is server-only through Resend. If email sending fails, the report flow still succeeds and the delivery failure is recorded in `email_events`.
+
+To enable report emails and internal lead notifications:
+
+```bash
+RESEND_API_KEY="..."
+FROM_EMAIL="Zybe Social <audit@yourdomain.com>"
+INTERNAL_LEAD_NOTIFY_EMAIL="hello@zybesocial.com"
+APP_BASE_URL="https://your-app.example.com"
+```
+
+The user email includes the audited website, overall score, top issues or quick wins, report link, and consent/contact preference note.
+
+The internal notification includes submitted lead contact fields, website/domain, score, report link, top issues, and consent status. Raw homepage HTML is never included.
+
 ## Security Notes
 
 - Report URLs use a separate public token instead of the internal audit request ID.
@@ -87,4 +104,5 @@ Raw HTML is never sent to the AI.
 - Homepage fetches re-check every redirect target and DNS result before requesting.
 - Raw HTML is parsed in memory only and is not stored.
 - AI output is validated with Zod. If validation fails, or if the AI marks an invented issue as observed, the deterministic fallback is used.
+- Email delivery events store recipient hash and domain, not raw recipient emails.
 - Rate limiting is in-memory. Use Redis, Upstash, or another shared store before running multiple app instances.
