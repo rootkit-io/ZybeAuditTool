@@ -74,4 +74,37 @@ export type AuditReport = AuditPreview & {
   recommendations: AuditRecommendation[];
   generatedAt: string;
   methodologyNote: string;
+  aiReport?: AiAuditReport;
+  aiReportSource?: "ai" | "deterministic_fallback";
+};
+
+export type AiAuditReportItem = {
+  title: string;
+  category: AuditCategory;
+  observed: boolean;
+  explanation: string;
+  recommendedAction: string;
+};
+
+export type AiAuditCategoryBreakdown = {
+  category: AuditCategory;
+  score: number;
+  summary: string;
+  evidence: string[];
+};
+
+export type AiAuditServiceOpportunity = {
+  service: string;
+  relevance: string;
+};
+
+export type AiAuditReport = {
+  executiveSummary: string;
+  overallScoreExplanation: string;
+  topIssues: AiAuditReportItem[];
+  categoryBreakdown: AiAuditCategoryBreakdown[];
+  quickWins: string[];
+  deeperRecommendations: AiAuditReportItem[];
+  zybeServiceOpportunities: AiAuditServiceOpportunity[];
+  callToAction: string;
 };

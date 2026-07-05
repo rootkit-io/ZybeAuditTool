@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearRateLimitForTests } from "@/lib/audits/rate-limit";
+import type { AuditReport } from "@/lib/audits/types";
 
 vi.mock("@/lib/audits/safe-fetch", () => ({
   safeFetchHomepage: vi.fn(async () => ({
@@ -28,6 +29,40 @@ vi.mock("@/lib/audits/safe-fetch", () => ({
     robotsTxtAvailable: true,
     sitemapXmlAvailable: true,
     checkedAt: "2026-07-05T00:00:00.000Z"
+  }))
+}));
+
+vi.mock("@/lib/audits/ai-report-service", () => ({
+  enhanceAuditReportWithAi: vi.fn(async (report: AuditReport) => ({
+    ...report,
+    aiReportSource: "deterministic_fallback",
+    aiReport: {
+      executiveSummary: "Fallback executive summary for API flow testing. This keeps the report useful without requiring an AI provider.",
+      overallScoreExplanation: "Fallback score explanation for API flow testing.",
+      topIssues: report.topIssues.map((issue) => ({
+        title: issue.title,
+        category: issue.category,
+        observed: issue.observed,
+        explanation: issue.detail,
+        recommendedAction: "Review this item and prioritize based on business impact."
+      })),
+      categoryBreakdown: Object.entries(report.categories).map(([category, score]) => ({
+        category,
+        score,
+        summary: `${category} scored ${score}.`,
+        evidence: ["API test evidence"]
+      })),
+      quickWins: ["Review the highest-priority observed issue."],
+      deeperRecommendations: report.recommendations.map((recommendation) => ({
+        title: recommendation.title,
+        category: recommendation.category,
+        observed: recommendation.label === "recommended fix",
+        explanation: recommendation.detail,
+        recommendedAction: "Turn this into a scoped implementation task."
+      })),
+      zybeServiceOpportunities: [],
+      callToAction: "Use this report as a practical starting point."
+    }
   }))
 }));
 
@@ -209,5 +244,6 @@ describe("audit API routes", () => {
     expect(data.reportUrl).toBe("/audit/report_public_token");
     expect(data.report.normalizedDomain).toBe("example.com");
     expect(data.report.observedSignals.fetchStatus).toBe("success");
+    expect(data.report.aiReportSource).toBe("deterministic_fallback");
   });
 });

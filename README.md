@@ -56,6 +56,29 @@ Observed signals include:
 
 If fetching fails or safety checks reject the target, the API still creates a fallback report from deterministic URL/domain heuristics. Non-observed recommendations are labeled as possible opportunities.
 
+## Phase 3 AI-Assisted Reports
+
+AI report generation is server-only and optional. If `AI_REPORT_PROVIDER` is not enabled, or if the provider fails, the app stores a deterministic written fallback report.
+
+To enable OpenAI-backed report writing:
+
+```bash
+AI_REPORT_PROVIDER="openai"
+OPENAI_API_KEY="..."
+OPENAI_MODEL="..."
+OPENAI_BASE_URL="https://api.openai.com"
+```
+
+The AI prompt includes only:
+
+- Submitted URL/domain with query strings removed
+- Structured observed homepage signals
+- Category scores
+- Detected observed issues
+- Possible opportunities and existing recommendations
+
+Raw HTML is never sent to the AI.
+
 ## Security Notes
 
 - Report URLs use a separate public token instead of the internal audit request ID.
@@ -63,4 +86,5 @@ If fetching fails or safety checks reject the target, the API still creates a fa
 - URL validation rejects non-http protocols, localhost, single-label hostnames, private/internal IPs, loopback, link-local ranges, and special-use local domains.
 - Homepage fetches re-check every redirect target and DNS result before requesting.
 - Raw HTML is parsed in memory only and is not stored.
+- AI output is validated with Zod. If validation fails, or if the AI marks an invented issue as observed, the deterministic fallback is used.
 - Rate limiting is in-memory. Use Redis, Upstash, or another shared store before running multiple app instances.

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError, validationError } from "@/lib/api/responses";
 import { attachLeadAndReport, getAuditRequestById } from "@/lib/audits/repository";
+import { enhanceAuditReportWithAi } from "@/lib/audits/ai-report-service";
 import { checkRateLimit } from "@/lib/audits/rate-limit";
 import { getClientIp, hashIp } from "@/lib/audits/request";
 import { generateAuditReport } from "@/lib/audits/scoring";
@@ -59,7 +60,8 @@ export async function POST(request: Request) {
     }
 
     const preview = existing.previewJson as AuditPreview | null;
-    const report = generateAuditReport(normalized.value, preview?.observedSignals);
+    const deterministicReport = generateAuditReport(normalized.value, preview?.observedSignals);
+    const report = await enhanceAuditReportWithAi(deterministicReport);
     const auditRequest = await attachLeadAndReport({
       auditRequestId: parsed.data.auditRequestId,
       email: parsed.data.email,

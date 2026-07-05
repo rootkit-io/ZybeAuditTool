@@ -46,10 +46,23 @@ export default async function AuditReportPage({ params }: PageProps) {
 
       <section className="mx-auto grid max-w-7xl gap-6 px-4 py-8 md:px-6 lg:grid-cols-[1fr_360px] lg:px-8">
         <div className="space-y-6">
+          {report.aiReport ? (
+            <div className="rounded-lg border bg-card p-5 text-card-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-xl font-semibold">Executive summary</h2>
+                <span className="rounded-sm bg-secondary px-2 py-1 text-xs text-secondary-foreground">
+                  {report.aiReportSource === "ai" ? "AI-assisted" : "deterministic fallback"}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">{report.aiReport.executiveSummary}</p>
+              <p className="mt-4 text-sm leading-6 text-muted-foreground">{report.aiReport.overallScoreExplanation}</p>
+            </div>
+          ) : null}
+
           <div className="rounded-lg border bg-card p-5 text-card-foreground">
             <h2 className="text-xl font-semibold">Top 3 issues</h2>
             <div className="mt-4 grid gap-3">
-              {report.topIssues.map((issue) => (
+              {(report.aiReport?.topIssues || report.topIssues).map((issue) => (
                 <div key={`${issue.category}-${issue.title}`} className="rounded-md border bg-background p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{issue.title}</p>
@@ -57,7 +70,12 @@ export default async function AuditReportPage({ params }: PageProps) {
                       {issue.observed ? "observed" : "possible opportunity"}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{issue.detail}</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {"explanation" in issue ? issue.explanation : issue.detail}
+                  </p>
+                  {"recommendedAction" in issue ? (
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{issue.recommendedAction}</p>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -83,27 +101,60 @@ export default async function AuditReportPage({ params }: PageProps) {
           <div className="rounded-lg border bg-card p-5 text-card-foreground">
             <h2 className="text-xl font-semibold">Recommended fixes</h2>
             <div className="mt-4 grid gap-3">
-              {report.recommendations.map((recommendation) => (
+              {(report.aiReport?.deeperRecommendations || report.recommendations).map((recommendation) => (
                 <div key={`${recommendation.category}-${recommendation.title}`} className="rounded-md border bg-background p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{recommendation.title}</p>
                     <span className="rounded-sm bg-secondary px-2 py-1 text-xs text-secondary-foreground">
-                      {recommendation.label}
+                      {"label" in recommendation
+                        ? recommendation.label
+                        : recommendation.observed
+                          ? "recommended fix"
+                          : "possible opportunity"}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{recommendation.detail}</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    {"explanation" in recommendation ? recommendation.explanation : recommendation.detail}
+                  </p>
+                  {"recommendedAction" in recommendation ? (
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{recommendation.recommendedAction}</p>
+                  ) : null}
                 </div>
               ))}
             </div>
           </div>
+
+          {report.aiReport ? (
+            <div className="rounded-lg border bg-card p-5 text-card-foreground">
+              <h2 className="text-xl font-semibold">Quick wins</h2>
+              <div className="mt-4 grid gap-3">
+                {report.aiReport.quickWins.map((quickWin) => (
+                  <div key={quickWin} className="rounded-md border bg-background p-4 text-sm leading-6 text-muted-foreground">
+                    {quickWin}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <aside className="space-y-4">
           <div className="rounded-lg border bg-card p-5 text-card-foreground">
             <h2 className="text-xl font-semibold">Want a human review?</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Zybe Social can help with website development, AI chatbots, branding, video, lead generation, outreach, and technical consulting.
+              {report.aiReport?.callToAction ||
+                "Zybe Social can help with website development, AI chatbots, branding, video, lead generation, outreach, and technical consulting."}
             </p>
+            {report.aiReport?.zybeServiceOpportunities.length ? (
+              <div className="mt-4 space-y-3">
+                {report.aiReport.zybeServiceOpportunities.map((opportunity) => (
+                  <div key={opportunity.service} className="rounded-md border bg-background p-3">
+                    <p className="text-sm font-medium">{opportunity.service}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{opportunity.relevance}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <div className="mt-4 grid gap-2">
               <a
                 href="mailto:hello@zybesocial.com?subject=Website%20audit%20follow-up"
