@@ -15,6 +15,13 @@ enum AuditRequestStatus {
   failed
 }
 
+enum CrawlStatus {
+  pending
+  crawling
+  complete
+  failed
+}
+
 model Lead {
   id               String         @id @default(cuid())
   email            String         @unique
@@ -45,6 +52,10 @@ model AuditRequest {
   reportJson       Json?
   ipHash           String?
   userAgent        String?
+  crawlStatus      CrawlStatus        @default(pending)
+  crawlStartedAt   DateTime?
+  crawlCompletedAt DateTime?
+  deepCrawlData    Json?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   emailEvents      EmailEvent[]

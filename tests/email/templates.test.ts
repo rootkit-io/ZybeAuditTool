@@ -15,6 +15,7 @@ const report: AuditReport = {
     "Trust signals": 72,
     "AI/chatbot opportunity": 78,
     "Lead generation readiness": 66,
+    "Performance & speed": 50,
     "Technical hygiene": 80
   },
   topIssues: [

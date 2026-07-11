@@ -26,7 +26,7 @@ vi.mock("@/lib/audits/safe-fetch", () => ({
     ctaKeywordDetected: true,
     formDetected: true,
     socialLinkDetected: true,
-    robotsTxtAvailable: true,
+    robotTxtAvailable: true,
     sitemapXmlAvailable: true,
     checkedAt: "2026-07-05T00:00:00.000Z"
   }))
@@ -185,7 +185,7 @@ describe("audit API routes", () => {
   it("rate limits repeated start attempts", async () => {
     const { POST } = await import("@/app/api/audits/start/route");
 
-    for (let attempt = 0; attempt < 8; attempt += 1) {
+    for (let attempt = 0; attempt < 12; attempt += 1) {
       await POST(
         new Request("http://test.local/api/audits/start", {
           method: "POST",

@@ -1,5 +1,5 @@
-import type { EmailEventStatus, EmailEventType } from "@prisma/client";
-import type { AuditPreview, AuditReport } from "./types";
+import type { CrawlStatus, EmailEventStatus, EmailEventType } from "@prisma/client";
+import type { AuditPreview, AuditReport, DeepCrawlData } from "./types";
 import { prisma } from "@/lib/prisma";
 
 export type CreateAuditRequestInput = {
@@ -42,12 +42,14 @@ export async function createAuditRequest(input: CreateAuditRequestInput) {
       overallScore: input.overallScore,
       previewJson: input.preview,
       ipHash: input.ipHash,
-      userAgent: input.userAgent
+      userAgent: input.userAgent,
+      crawlStatus: "pending"
     },
     select: {
       id: true,
       reportToken: true,
-      previewJson: true
+      previewJson: true,
+      crawlStatus: true
     }
   });
 }
@@ -86,7 +88,9 @@ export async function attachLeadAndReport(input: AttachLeadInput) {
         leadId: true,
         reportToken: true,
         reportJson: true,
-        normalizedDomain: true
+        normalizedDomain: true,
+        deepCrawlData: true,
+        crawlStatus: true
       }
     });
   });
@@ -121,6 +125,8 @@ export async function getAuditRequestById(auditRequestId: string) {
       overallScore: true,
       previewJson: true,
       reportJson: true,
+      deepCrawlData: true,
+      crawlStatus: true,
       createdAt: true
     }
   });
@@ -136,13 +142,67 @@ export async function getAuditReportByToken(reportToken: string) {
       status: true,
       overallScore: true,
       reportJson: true,
+      deepCrawlData: true,
+      crawlStatus: true,
       createdAt: true
     }
   });
 }
 
+// ─── Crawl Status Management ────────────────────────────────────────
+
+export async function updateCrawlStatus(
+  auditRequestId: string,
+  status: CrawlStatus | "pending" | "crawling" | "complete" | "failed",
+  deepCrawlData?: DeepCrawlData
+) {
+  const data: Record<string, unknown> = {
+    crawlStatus: status
+  };
+
+  if (status === "crawling") {
+    data.crawlStartedAt = new Date();
+  }
+
+  if (status === "complete" || status === "failed") {
+    data.crawlCompletedAt = new Date();
+  }
+
+  if (deepCrawlData) {
+    data.deepCrawlData = deepCrawlData;
+  }
+
+  return prisma.auditRequest.update({
+    where: { id: auditRequestId },
+    data,
+    select: { id: true, crawlStatus: true }
+  });
+}
+
+export async function getCrawlStatus(auditRequestId: string) {
+  const result = await prisma.auditRequest.findUnique({
+    where: { id: auditRequestId },
+    select: {
+      id: true,
+      crawlStatus: true,
+      crawlStartedAt: true,
+      crawlCompletedAt: true,
+      deepCrawlData: true
+    }
+  });
+
+  if (!result) return null;
+
+  return {
+    auditRequestId: result.id,
+    status: result.crawlStatus,
+    startedAt: result.crawlStartedAt?.toISOString() || null,
+    completedAt: result.crawlCompletedAt?.toISOString() || null,
+    data: result.deepCrawlData as DeepCrawlData | null
+  };
+}
+
 function emptyToNull(value?: string) {
   const trimmed = value?.trim();
-
   return trimmed ? trimmed : null;
 }

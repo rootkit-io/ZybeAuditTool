@@ -1,10 +1,10 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import { parseHomepageHtml } from "./html-signals";
+import { parseHomepageHtml, extractTechnologiesFromHtml } from "./html-signals";
 import type { HomepageObservedSignals } from "./types";
 import { isPrivateOrInternalIp, normalizeWebsiteUrl } from "./url";
 
-const defaultTimeoutMs = 4_000;
+const defaultTimeoutMs = 5_000;
 const wellKnownTimeoutMs = 1_500;
 const maxRedirects = 3;
 export const maxHomepageHtmlBytes = 256_000;
@@ -23,7 +23,7 @@ type SafeFetchOptions = {
 };
 
 type WellKnownAvailability = {
-  robotsTxtAvailable?: boolean;
+  robotTxtAvailable?: boolean;
   sitemapXmlAvailable?: boolean;
 };
 
@@ -36,6 +36,7 @@ export async function safeFetchHomepage(
   const now = options.now || (() => new Date());
   const timeoutMs = options.timeoutMs || defaultTimeoutMs;
   const requestedUrl = toHomepageUrl(websiteUrl);
+  const usesHttps = requestedUrl.startsWith("https://");
 
   try {
     await assertSafeNetworkTarget(requestedUrl, dnsLookup);
@@ -48,6 +49,17 @@ export async function safeFetchHomepage(
     const finalUrl = responseResult.finalUrl;
     const wellKnown = await checkWellKnownAvailability(finalUrl, { fetchImpl, dnsLookup }).catch(() => ({}));
     const contentType = responseResult.response.headers.get("content-type") || undefined;
+    const contentEncoding = responseResult.response.headers.get("content-encoding") || undefined;
+    const server = responseResult.response.headers.get("server") || undefined;
+    const xFrameOptions = responseResult.response.headers.get("x-frame-options") || undefined;
+    const csp = responseResult.response.headers.get("content-security-policy") || undefined;
+
+    // Determine if compression is used
+    const hasCompression = contentEncoding !== undefined && contentEncoding.length > 0;
+
+    const redirectUrl = new URL(finalUrl);
+    const redirectUsesHttps = redirectUrl.protocol === "https:";
+
     const baseSignals = {
       requestedUrl,
       finalUrl: sanitizeObservedUrl(finalUrl),
@@ -56,6 +68,12 @@ export async function safeFetchHomepage(
       redirectCount: responseResult.redirectCount,
       contentType,
       htmlSizeLimitBytes: maxHomepageHtmlBytes,
+      // HTTP header signals (100% confirmed)
+      usesHttps: usesHttps && redirectUsesHttps,
+      hasCompression,
+      serverHeader: server,
+      xFrameOptionsHeader: xFrameOptions,
+      contentSecurityPolicyHeader: csp,
       checkedAt: now().toISOString(),
       ...wellKnown
     };
@@ -66,7 +84,7 @@ export async function safeFetchHomepage(
         fetchStatus: "failed",
         reachable: true,
         failureReason: `status_${responseResult.response.status}`
-      };
+      } as HomepageObservedSignals;
     }
 
     if (contentType && !contentType.toLowerCase().includes("text/html")) {
@@ -75,7 +93,7 @@ export async function safeFetchHomepage(
         fetchStatus: "failed",
         reachable: true,
         failureReason: "non_html_response"
-      };
+      } as HomepageObservedSignals;
     }
 
     const htmlResult = await readLimitedText(responseResult.response, maxHomepageHtmlBytes);
@@ -87,16 +105,19 @@ export async function safeFetchHomepage(
         reachable: true,
         htmlSizeBytes: htmlResult.bytesRead,
         failureReason: "html_size_limit_exceeded"
-      };
+      } as HomepageObservedSignals;
     }
+
+    // Parse HTML for all signals
+    const htmlSignals = parseHomepageHtml(htmlResult.text, finalUrl);
 
     return {
       ...baseSignals,
-      ...parseHomepageHtml(htmlResult.text, finalUrl),
+      ...htmlSignals,
       fetchStatus: "success",
       reachable: true,
       htmlSizeBytes: htmlResult.bytesRead
-    };
+    } as HomepageObservedSignals;
   } catch (error) {
     return {
       fetchStatus: "failed",
@@ -105,9 +126,11 @@ export async function safeFetchHomepage(
       redirected: false,
       redirectCount: 0,
       htmlSizeLimitBytes: maxHomepageHtmlBytes,
+      usesHttps,
+      hasCompression: false,
       checkedAt: now().toISOString(),
       failureReason: toFailureReason(error)
-    };
+    } as HomepageObservedSignals;
   }
 }
 
@@ -176,7 +199,7 @@ async function checkWellKnownAvailability(
     checkWellKnownUrl(`${origin}/sitemap.xml`, fetchImpl, dnsLookup)
   ]);
 
-  return { robotsTxtAvailable, sitemapXmlAvailable };
+  return { robotTxtAvailable: robotsTxtAvailable, sitemapXmlAvailable };
 }
 
 async function checkWellKnownUrl(url: string, fetchImpl: FetchLike, dnsLookup: DnsLookupLike) {
@@ -267,20 +290,16 @@ function assertSafeUrl(url: string) {
 
 function toHomepageUrl(websiteUrl: string) {
   const parsed = new URL(websiteUrl);
-
   parsed.pathname = "/";
   parsed.search = "";
   parsed.hash = "";
-
   return parsed.toString();
 }
 
 function sanitizeObservedUrl(url: string) {
   const parsed = new URL(url);
-
   parsed.search = "";
   parsed.hash = "";
-
   return parsed.toString();
 }
 

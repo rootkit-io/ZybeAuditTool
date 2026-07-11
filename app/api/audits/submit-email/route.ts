@@ -5,7 +5,7 @@ import { enhanceAuditReportWithAi } from "@/lib/audits/ai-report-service";
 import { checkRateLimit } from "@/lib/audits/rate-limit";
 import { getClientIp, hashIp } from "@/lib/audits/request";
 import { generateAuditReport } from "@/lib/audits/scoring";
-import type { AuditPreview } from "@/lib/audits/types";
+import type { AuditPreview, DeepCrawlData } from "@/lib/audits/types";
 import { normalizeWebsiteUrl } from "@/lib/audits/url";
 import { submitEmailSchema } from "@/lib/audits/validation";
 import { validateServerEnv } from "@/lib/env";
@@ -22,11 +22,10 @@ export async function POST(request: Request) {
     console.error("server_env_invalid", {
       error: error instanceof Error ? error.message : "unknown"
     });
-
     return apiError("Server configuration error", 500, "SERVER_CONFIG_ERROR");
   }
 
-  const rateLimit = await checkRateLimit(`audit:email:${ipHash}`, 6, 60_000);
+  const rateLimit = await checkRateLimit(`audit:email:${ipHash}`, 10, 60_000);
 
   if (!rateLimit.ok) {
     return apiError("Too many email submissions. Try again in a minute.", 429, "RATE_LIMITED", {
@@ -67,14 +66,28 @@ export async function POST(request: Request) {
     }
 
     const preview = existing.previewJson as AuditPreview | null;
+
+    // Build deterministic report from observed signals
     const deterministicReport = generateAuditReport(normalized.value, preview?.observedSignals);
+
+    // Include deep crawl data if available (may still be running)
+    const deepCrawlData = existing.deepCrawlData as DeepCrawlData | null;
+
+    if (deepCrawlData && deepCrawlData.pages.length > 0) {
+      deterministicReport.deepCrawlData = deepCrawlData;
+    }
+
+    // Enhance with AI (Mistral via OpenAI-compatible API)
     const report = await enhanceAuditReportWithAi(deterministicReport);
+
     trackAnalyticsEvent("report_generated", {
       auditRequestId: parsed.data.auditRequestId,
       normalizedDomain: normalized.value.normalizedDomain,
       score: report.overallScore,
-      aiReportSource: report.aiReportSource
+      aiReportSource: report.aiReportSource,
+      hasDeepCrawlData: !!deepCrawlData
     });
+
     const auditRequest = await attachLeadAndReport({
       auditRequestId: parsed.data.auditRequestId,
       email: parsed.data.email,
@@ -85,7 +98,8 @@ export async function POST(request: Request) {
       report
     });
 
-    await deliverAuditEmails({
+    // Send emails in background (fire-and-forget)
+    deliverAuditEmails({
       auditRequestId: auditRequest.id,
       leadId: auditRequest.leadId,
       reportToken: auditRequest.reportToken,
@@ -113,7 +127,6 @@ export async function POST(request: Request) {
       auditRequestId: parsed.data.auditRequestId,
       error: error instanceof Error ? error.message : "unknown"
     });
-
     return apiError("Could not save your report. Please try again.", 500);
   }
 }

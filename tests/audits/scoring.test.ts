@@ -27,7 +27,7 @@ describe("audit scoring", () => {
     });
 
     expect(preview.topIssues[0]).toMatchObject({
-      title: "HTTPS should be enabled",
+      title: "HTTPS is not enabled",
       observed: true
     });
   });
@@ -57,7 +57,7 @@ describe("audit scoring", () => {
         ctaKeywordDetected: false,
         formDetected: false,
         socialLinkDetected: false,
-        robotsTxtAvailable: false,
+        robotTxtAvailable: false,
         sitemapXmlAvailable: false,
         checkedAt: "2026-07-05T00:00:00.000Z"
       }

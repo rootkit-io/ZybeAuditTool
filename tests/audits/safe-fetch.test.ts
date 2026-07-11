@@ -48,7 +48,7 @@ describe("safeFetchHomepage", () => {
       ctaKeywordDetected: true,
       formDetected: true,
       socialLinkDetected: true,
-      robotsTxtAvailable: true,
+      robotTxtAvailable: true,
       sitemapXmlAvailable: true
     });
     expect(JSON.stringify(result)).not.toContain("<html>");

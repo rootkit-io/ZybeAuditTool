@@ -20,13 +20,12 @@ export async function POST(request: Request) {
     console.error("server_env_invalid", {
       error: error instanceof Error ? error.message : "unknown"
     });
-
     return apiError("Server configuration error", 500, "SERVER_CONFIG_ERROR");
   }
 
   trackAnalyticsEvent("audit_started", { ipHash });
 
-  const rateLimit = await checkRateLimit(`audit:start:${ipHash}`, 8, 60_000);
+  const rateLimit = await checkRateLimit(`audit:start:${ipHash}`, 12, 60_000);
 
   if (!rateLimit.ok) {
     return apiError("Too many audit attempts. Try again in a minute.", 429, "RATE_LIMITED", {
@@ -48,6 +47,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Phase 1: Fast HTTP fetch for instant preview
     const observedSignals = await safeFetchHomepage(normalized.value.websiteUrl);
     const preview = generateAuditPreview(normalized.value, observedSignals);
     const auditRequest = await createAuditRequest({
@@ -58,6 +58,24 @@ export async function POST(request: Request) {
       userAgent: safeUserAgent(request.headers)
     });
 
+    // Phase 2: Fire-and-forget background deep crawl (results arrive while user fills email)
+    // We import dynamically to avoid pulling in firecrawl deps at module level
+    const { runBackgroundCrawl } = await import("@/lib/audits/deep-crawl");
+    const repo = await import("@/lib/audits/repository");
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    runBackgroundCrawl(auditRequest.id, normalized.value.websiteUrl, normalized.value.normalizedDomain, async (id, status, data) => {
+      return repo.updateCrawlStatus(id, status as any, data as any);
+    }).catch(
+      (err) => {
+        console.error("background_crawl_trigger_failed", {
+          auditRequestId: auditRequest.id,
+          error: err instanceof Error ? err.message : "unknown"
+        });
+      }
+    );
+
+    // Return preview immediately — no waiting for deep crawl
     trackAnalyticsEvent("audit_preview_created", {
       auditRequestId: auditRequest.id,
       normalizedDomain: normalized.value.normalizedDomain,
@@ -77,7 +95,6 @@ export async function POST(request: Request) {
       normalizedDomain: normalized.value.normalizedDomain,
       error: error instanceof Error ? error.message : "unknown"
     });
-
     return apiError("Could not create audit preview. Please try again.", 500);
   }
 }

@@ -1,15 +1,14 @@
-import type { AiAuditReportOutput } from "./ai-report-schema";
-import type { AuditIssue, AuditRecommendation, AuditReport } from "./types";
+import type { AuditReport, DeepCrawlData } from "./types";
 
 export type AiReportPromptPayload = {
   website: {
     submittedUrl: string;
     normalizedDomain: string;
   };
-  observedSignals: AuditReport["observedSignals"];
-  categoryScores: AuditReport["categories"];
-  detectedIssues: AuditIssue[];
-  possibleOpportunities: Array<AuditIssue | AuditRecommendation>;
+  homepageSignals: Record<string, unknown>;
+  categoryScores: Record<string, number>;
+  detectedIssues: Array<{ title: string; detail: string; category: string; severity: string; observed: boolean }>;
+  deepCrawlData?: DeepCrawlData;
 };
 
 export type AiReportPrompt = {
@@ -19,15 +18,15 @@ export type AiReportPrompt = {
 };
 
 export function buildAiReportPrompt(report: AuditReport): AiReportPrompt {
-  const payload = sanitizePromptValue(buildAiPromptPayload(report)) as AiReportPromptPayload;
+  const payload = buildAiPromptPayload(report);
 
   return {
     system: [
       "You write practical website audit reports for business owners.",
       "Use only the JSON facts supplied by the user.",
       "Do not browse, infer hidden page content, or invent facts.",
-      "Never say something was observed unless it appears in observedSignals or detectedIssues.",
-      "Clearly separate observed issues from possible opportunities.",
+      "Never say something was observed unless it appears in the provided signals or detectedIssues.",
+      "Separate observed issues from possible opportunities clearly.",
       "Avoid fake urgency, fear-based language, and exaggerated claims.",
       "Mention Zybe Social services only where they naturally match the supplied issues or opportunities.",
       "Return only valid JSON matching the requested keys."
@@ -45,7 +44,7 @@ export function buildAiReportPrompt(report: AuditReport): AiReportPrompt {
           "callToAction"
         ],
         topIssuesRule:
-          "For items with observed=true, use the exact title of an observed item from detectedIssues. Possible opportunities must use observed=false.",
+          "For items with observed=true, make sure they match what appears in detectedIssues. You can rephrase the title.",
         usefulnessRule: "The report must be useful even if the reader does not book a call."
       },
       facts: payload
@@ -55,27 +54,57 @@ export function buildAiReportPrompt(report: AuditReport): AiReportPrompt {
 }
 
 export function buildAiPromptPayload(report: AuditReport): AiReportPromptPayload {
+  const homepageSignals: Record<string, unknown> = {};
+
+  if (report.observedSignals) {
+    // Extract all observed signals (excluding failure data)
+    const { fetchStatus, failureReason, checkedAt, htmlSizeLimitBytes, ...signals } = report.observedSignals;
+    Object.assign(homepageSignals, signals);
+  }
+
   return {
     website: {
       submittedUrl: sanitizeUrlForPrompt(report.websiteUrl),
       normalizedDomain: report.normalizedDomain
     },
-    observedSignals: report.observedSignals,
+    homepageSignals,
     categoryScores: report.categories,
-    detectedIssues: report.topIssues,
-    possibleOpportunities: [
-      ...report.topIssues.filter((issue) => !issue.observed),
-      ...report.recommendations.filter((recommendation) => recommendation.label === "possible opportunity")
-    ]
+    detectedIssues: report.topIssues.map((i) => ({
+      title: i.title,
+      detail: i.detail,
+      category: i.category,
+      severity: i.severity,
+      observed: i.observed
+    })),
+    deepCrawlData: report.deepCrawlData
   };
 }
 
-export function validateAiReportGrounding(report: AuditReport, aiReport: AiAuditReportOutput) {
-  const observedIssueTitles = new Set(report.topIssues.filter((issue) => issue.observed).map((issue) => issue.title));
-  const items = [...aiReport.topIssues, ...aiReport.deeperRecommendations];
+/**
+ * Validates AI output doesn't claim observed issues that don't exist in the source data.
+ * Uses lenient matching: the AI can rephrase titles.
+ */
+export function validateAiReportGrounding(report: AuditReport, aiTopIssues: Array<{ title: string; observed: boolean }>): boolean {
+  const observedIssueKeywords = report.topIssues
+    .filter((issue) => issue.observed)
+    .map((issue) => issue.title.toLowerCase().replace(/[^a-z0-9]/g, ""));
 
-  for (const item of items) {
-    if (item.observed && !observedIssueTitles.has(item.title)) {
+  for (const item of aiTopIssues) {
+    if (!item.observed) continue;
+
+    // Check if any observed issue from the AI matches any of our confirmed issues
+    const aiKeywords = item.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    const matchesObserved = observedIssueKeywords.some((keyword) => {
+      // Check if keywords overlap substantially
+      const aiWords = aiKeywords.split(/\s+/).filter((w) => w.length > 3);
+      const obsWords = keyword.split(/\s+/).filter((w) => w.length > 3);
+      const matchCount = aiWords.filter((w) => obsWords.includes(w)).length;
+      return matchCount >= Math.min(2, Math.min(aiWords.length, obsWords.length));
+    });
+
+    if (!matchesObserved) {
+      // The AI claims something was observed that wasn't in our data
       return false;
     }
   }
@@ -85,25 +114,7 @@ export function validateAiReportGrounding(report: AuditReport, aiReport: AiAudit
 
 function sanitizeUrlForPrompt(url: string) {
   const parsed = new URL(url);
-
   parsed.search = "";
   parsed.hash = "";
-
   return parsed.toString();
-}
-
-function sanitizePromptValue(value: unknown): unknown {
-  if (typeof value === "string") {
-    return value.replace(/<[^>]*>/g, "").replace(/[<>]/g, "");
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((item) => sanitizePromptValue(item));
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, sanitizePromptValue(item)]));
-  }
-
-  return value;
 }

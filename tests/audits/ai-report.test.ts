@@ -18,6 +18,7 @@ const baseReport: AuditReport = {
     "Trust signals": 70,
     "AI/chatbot opportunity": 76,
     "Lead generation readiness": 62,
+    "Performance & speed": 50,
     "Technical hygiene": 80
   },
   topIssues: [
@@ -57,7 +58,7 @@ const baseReport: AuditReport = {
     ctaKeywordDetected: false,
     formDetected: false,
     socialLinkDetected: true,
-    robotsTxtAvailable: true,
+    robotTxtAvailable: true,
     sitemapXmlAvailable: false,
     checkedAt: "2026-07-05T00:00:00.000Z"
   },

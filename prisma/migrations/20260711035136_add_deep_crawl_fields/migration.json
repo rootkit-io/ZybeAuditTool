@@ -1,0 +1,39 @@
+{
+  "version": "5.2",
+  "steps": [
+    {
+      "tag": "CreateEnum",
+      "enum": "CrawlStatus",
+      "values": ["pending", "crawling", "complete", "failed"]
+    },
+    {
+      "tag": "AlterColumn",
+      "table": "audit_requests",
+      "column": "crawlStatus",
+      "type": "CrawlStatus",
+      "default": "\"pending\"",
+      "isRequired": true
+    },
+    {
+      "tag": "AlterColumn",
+      "table": "audit_requests",
+      "column": "crawlStartedAt",
+      "type": "TIMESTAMP(3)",
+      "isRequired": false
+    },
+    {
+      "tag": "AlterColumn",
+      "table": "audit_requests",
+      "column": "crawlCompletedAt",
+      "type": "TIMESTAMP(3)",
+      "isRequired": false
+    },
+    {
+      "tag": "AlterColumn",
+      "table": "audit_requests",
+      "column": "deepCrawlData",
+      "type": "JSONB",
+      "isRequired": false
+    }
+  ]
+}

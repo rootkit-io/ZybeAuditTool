@@ -30,7 +30,9 @@ const serverEnvSchema = z
     FROM_EMAIL: optionalNonEmptyString("FROM_EMAIL is required for email delivery"),
     INTERNAL_LEAD_NOTIFY_EMAIL: optionalNonEmptyString("INTERNAL_LEAD_NOTIFY_EMAIL is required for email delivery"),
     UPSTASH_REDIS_REST_URL: optionalUrl("UPSTASH_REDIS_REST_URL must be a valid URL"),
-    UPSTASH_REDIS_REST_TOKEN: optionalNonEmptyString("UPSTASH_REDIS_REST_TOKEN is required when UPSTASH_REDIS_REST_URL is set")
+    UPSTASH_REDIS_REST_TOKEN: optionalNonEmptyString("UPSTASH_REDIS_REST_TOKEN is required when UPSTASH_REDIS_REST_URL is set"),
+    FIRECRAWL_BASE_URL: optionalUrl("FIRECRAWL_BASE_URL must be a valid URL").default("http://localhost:3002"),
+    FIRECRAWL_API_KEY: optionalNonEmptyString("FIRECRAWL_API_KEY")
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production") {
@@ -88,7 +90,6 @@ const serverEnvSchema = z
 
 export function validateServerEnv() {
   const parsed = serverEnvSchema.safeParse(process.env);
-
   if (!parsed.success) {
     throw new Error(
       `Invalid server environment: ${parsed.error.issues.map((issue) => issue.path.join(".")).join(", ")}`
@@ -100,7 +101,6 @@ export function getIpHashSalt() {
   if (process.env.NODE_ENV === "production" && !process.env.IP_HASH_SALT) {
     throw new Error("Invalid server environment: IP_HASH_SALT");
   }
-
   return process.env.IP_HASH_SALT || "zybe-audit-tool-dev-only-salt";
 }
 
@@ -111,16 +111,9 @@ export function getEmailConfig() {
     internalLeadNotifyEmail: process.env.INTERNAL_LEAD_NOTIFY_EMAIL || "",
     appBaseUrl: process.env.APP_BASE_URL || ""
   };
-
-  if (
-    !config.resendApiKey ||
-    !config.fromEmail ||
-    !config.internalLeadNotifyEmail ||
-    !config.appBaseUrl
-  ) {
+  if (!config.resendApiKey || !config.fromEmail || !config.internalLeadNotifyEmail || !config.appBaseUrl) {
     return null;
   }
-
   return config;
 }
 
