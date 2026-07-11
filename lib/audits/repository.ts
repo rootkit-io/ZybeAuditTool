@@ -1,4 +1,4 @@
-import type { CrawlStatus, EmailEventStatus, EmailEventType } from "@prisma/client";
+import type { EmailEventStatus, EmailEventType } from "@prisma/client";
 import type { AuditPreview, AuditReport, DeepCrawlData } from "./types";
 import { prisma } from "@/lib/prisma";
 
@@ -151,10 +151,11 @@ export async function getAuditReportByToken(reportToken: string) {
 
 // ─── Crawl Status Management ────────────────────────────────────────
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function updateCrawlStatus(
   auditRequestId: string,
-  status: CrawlStatus | "pending" | "crawling" | "complete" | "failed",
-  deepCrawlData?: DeepCrawlData
+  status: "pending" | "crawling" | "complete" | "failed",
+  deepCrawlData?: Record<string, unknown>
 ) {
   const data: Record<string, unknown> = {
     crawlStatus: status

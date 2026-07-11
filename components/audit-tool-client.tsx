@@ -2,16 +2,18 @@
 
 import {
   ArrowRight,
+  BarChart3,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
+  ChevronRight,
   Cpu,
   Gauge,
   Globe,
   Loader2,
   LockKeyhole,
+  Scan,
   Search,
   Sparkles,
+  TrendingUp,
   Zap
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -48,7 +50,6 @@ const auditChecks = [
   "Performance & speed"
 ];
 
-// Steps shown progressively during crawl
 const CRAWL_STEPS = [
   { icon: Search, label: "Fetching homepage HTML" },
   { icon: Globe, label: "Analyzing page structure" },
@@ -57,6 +58,16 @@ const CRAWL_STEPS = [
   { icon: Zap, label: "Detecting technologies" },
   { icon: CheckCircle2, label: "Deep crawl complete" }
 ];
+
+const SCORE_COLORS = [
+  { threshold: 80, text: "text-emerald-600", bg: "bg-emerald-50", ring: "ring-emerald-200", label: "Good" },
+  { threshold: 60, text: "text-amber-600", bg: "bg-amber-50", ring: "ring-amber-200", label: "Fair" },
+  { threshold: 0, text: "text-red-600", bg: "bg-red-50", ring: "ring-red-200", label: "Needs work" }
+] as const;
+
+function getScoreStyle(score: number) {
+  return SCORE_COLORS.find((c) => score >= c.threshold) || SCORE_COLORS[SCORE_COLORS.length - 1];
+}
 
 export function AuditToolClient() {
   const [websiteUrl, setWebsiteUrl] = useState("");
@@ -70,20 +81,15 @@ export function AuditToolClient() {
   const [isStarting, setIsStarting] = useState(false);
   const [isSubmittingEmail, setIsSubmittingEmail] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Crawl progress state
   const [crawlStatus, setCrawlStatus] = useState<CrawlStatusData | null>(null);
   const [crawlStep, setCrawlStep] = useState(0);
-  const crawlPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Animated issue reveal
   const [visibleIssues, setVisibleIssues] = useState(0);
+  const [showForm, setShowForm] = useState(false);
+  type CrawlPollRef = { stepInterval: ReturnType<typeof setInterval>; pollInterval: ReturnType<typeof setInterval> };
+  const crawlPollRef = useRef<CrawlPollRef | null>(null);
   const issueTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const weakestCategory = useMemo(() => {
-    if (!preview) return null;
-    return Object.entries(preview.preview.categories).sort(([, a], [, b]) => a - b)[0];
-  }, [preview]);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
 
   // ─── Start Audit ────────────────────────────────────────────────
 
@@ -95,6 +101,7 @@ export function AuditToolClient() {
     setCrawlStatus(null);
     setCrawlStep(0);
     setVisibleIssues(0);
+    setShowForm(false);
     setIsStarting(true);
 
     try {
@@ -110,8 +117,14 @@ export function AuditToolClient() {
       }
 
       setPreview(data as StartResponse);
+      setShowForm(true);
 
-      // Start polling for crawl status
+      // Scroll to results after a tiny delay for rendering
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setTimeout(() => emailRef.current?.focus(), 600);
+      }, 300);
+
       startCrawlPolling(data.auditRequestId);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not create preview audit.");
@@ -123,17 +136,12 @@ export function AuditToolClient() {
   // ─── Crawl Polling ──────────────────────────────────────────────
 
   function startCrawlPolling(auditRequestId: string) {
-    // Animate through steps as time passes (gives user visual feedback)
     let step = 0;
     const stepInterval = setInterval(() => {
       step++;
-      if (step < CRAWL_STEPS.length) {
-        setCrawlStep(step);
-      }
-    }, 3000);
-    crawlPollRef.current = stepInterval;
+      if (step < CRAWL_STEPS.length) setCrawlStep(step);
+    }, 2800);
 
-    // Actually poll the backend
     const pollInterval = setInterval(async () => {
       try {
         const res = await fetch(`/api/audits/crawl/status/${auditRequestId}`);
@@ -144,65 +152,51 @@ export function AuditToolClient() {
         if (data.status === "complete" || data.status === "failed") {
           clearInterval(pollInterval);
           clearInterval(stepInterval);
-          crawlPollRef.current = null;
           setCrawlStep(data.status === "complete" ? CRAWL_STEPS.length - 1 : CRAWL_STEPS.length - 2);
         }
-
-        // Update step based on actual data
-        if (data.totalPagesCrawled > 0) setCrawlStep(Math.max(3, crawlStep));
-        if (data.technologiesFound > 0) setCrawlStep(Math.max(4, crawlStep));
+        if (data.totalPagesCrawled > 0) setCrawlStep((s) => Math.max(s, 3));
+        if (data.technologiesFound > 0) setCrawlStep((s) => Math.max(s, 4));
       } catch {
-        // Polling failed, continue
+        /* ignore */
       }
     }, 2000);
 
-    // Store both intervals
-    (crawlPollRef as any) = { stepInterval, pollInterval };
+    crawlPollRef.current = { stepInterval, pollInterval };
   }
 
-  // Cleanup polling on unmount
   useEffect(() => {
     return () => {
-      if (crawlPollRef.current) {
-        clearInterval(crawlPollRef.current);
+      const ref = crawlPollRef.current;
+      if (ref) {
+        clearInterval(ref.stepInterval);
+        clearInterval(ref.pollInterval);
       }
     };
   }, []);
 
-  // ─── Animated Issue Reveal ──────────────────────────────────────
+  // ─── One-by-one issue reveal ────────────────────────────────────
 
   useEffect(() => {
     if (!preview) return;
-
-    // Reveal issues one by one
-    const totalIssues = preview.preview.topIssues.length;
-    if (totalIssues === 0) return;
+    const total = preview.preview.topIssues.length;
+    if (total === 0) return;
 
     setVisibleIssues(0);
     let i = 0;
     issueTimerRef.current = setInterval(() => {
       i++;
       setVisibleIssues(i);
-      if (i >= totalIssues) {
-        clearInterval(issueTimerRef.current!);
-      }
-    }, 400);
+      if (i >= total) clearInterval(issueTimerRef.current!);
+    }, 350);
 
-    return () => {
-      if (issueTimerRef.current) clearInterval(issueTimerRef.current);
-    };
+    return () => { if (issueTimerRef.current) clearInterval(issueTimerRef.current); };
   }, [preview]);
 
   // ─── Submit Email ───────────────────────────────────────────────
 
   async function submitEmail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!preview) {
-      setError("Start with a website URL first.");
-      return;
-    }
-
+    if (!preview) { setError("Start with a website URL first."); return; }
     setError(null);
     setIsSubmittingEmail(true);
 
@@ -211,26 +205,16 @@ export function AuditToolClient() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          auditRequestId: preview.auditRequestId,
-          email,
-          name,
-          company,
-          phone,
-          consentToContact
+          auditRequestId: preview.auditRequestId, email, name, company, phone, consentToContact
         })
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(readApiError(data, "Could not unlock report."));
-      }
-
+      if (!response.ok) throw new Error(readApiError(data, "Could not unlock report."));
       setReport(data as SubmitResponse);
-
-      // Clean up crawl polling
-      if (crawlPollRef.current) {
-        clearInterval(crawlPollRef.current);
-        crawlPollRef.current = null;
+      const ref = crawlPollRef.current;
+      if (ref) {
+        clearInterval(ref.stepInterval);
+        clearInterval(ref.pollInterval);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not unlock report.");
@@ -239,322 +223,371 @@ export function AuditToolClient() {
     }
   }
 
-  // ─── Score color helper ─────────────────────────────────────────
-
-  const scoreColor = (score: number) => {
-    if (score >= 80) return "text-green-600";
-    if (score >= 60) return "text-yellow-600";
-    return "text-red-600";
-  };
-
-  const scoreBgColor = (score: number) => {
-    if (score >= 80) return "bg-green-100";
-    if (score >= 60) return "bg-yellow-50";
-    return "bg-red-50";
-  };
+  const previewScore = preview?.preview.overallScore ?? 0;
+  const scoreStyle = getScoreStyle(previewScore);
 
   return (
-    <main className="min-h-screen bg-background">
-      {/* ─── Hero Section ─────────────────────────────────────────── */}
-      <section className="border-b bg-gradient-to-b from-muted/60 to-background">
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 md:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-14">
-          <div className="flex flex-col justify-center gap-5">
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border bg-background/80 px-4 py-1.5 text-sm text-muted-foreground shadow-sm backdrop-blur">
-              <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
-              Free Zybe Social website audit
-            </div>
-            <div className="max-w-3xl space-y-3">
-              <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-5xl">
-                Website audit that <span className="text-primary">actually finds issues</span>
-              </h1>
-              <p className="max-w-prose text-base leading-7 text-muted-foreground md:text-lg">
-                40+ real homepage checks. No fake scores. Get a practical audit with confirmed issues and AI-powered recommendations in seconds.
-              </p>
-            </div>
-            <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-              {auditChecks.map((check) => (
-                <div key={check} className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                  <span>{check}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+    <div className="min-h-screen bg-background">
+      {/* ─── HERO ─────────────────────────────────────────────────── */}
+      <section className="relative min-h-[90vh] flex items-center overflow-hidden">
+        {/* Background image with overlay */}
+        <div className="absolute inset-0 -z-10">
+          <img
+            src="/bg.png"
+            alt=""
+            className="h-full w-full object-cover"
+            aria-hidden="true"
+          />
+          {/* Multi-layer gradient overlay for readability */}
+          <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-white/85 to-white" />
+          <div className="absolute inset-0 bg-gradient-to-r from-white/60 via-transparent to-white/40" />
+        </div>
 
-          {/* ─── URL Input Form ──────────────────────────────────── */}
-          <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-md md:p-6">
-            <form className="space-y-4" onSubmit={startAudit} aria-busy={isStarting}>
-              <div className="space-y-2">
-                <label htmlFor="websiteUrl" className="text-sm font-medium">
-                  Website URL
-                </label>
-                <div className="relative">
-                  <Globe className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                  <input
-                    id="websiteUrl"
-                    name="websiteUrl"
-                    type="url"
-                    inputMode="url"
-                    autoComplete="url"
-                    placeholder="https://example.com"
-                    value={websiteUrl}
-                    onChange={(event) => setWebsiteUrl(event.target.value)}
-                    className="min-h-11 w-full rounded-md border bg-background pl-9 pr-3 py-2 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    required
-                  />
+        <div className="mx-auto w-full max-w-7xl px-4 py-16 md:px-6 lg:px-8">
+          <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+            {/* Left: Value prop */}
+            <div className="space-y-6 animate-fade-in-up">
+              <div className="inline-flex items-center gap-2 rounded-full border bg-white/70 backdrop-blur-sm px-4 py-1.5 text-sm text-muted-foreground shadow-sm">
+                <Sparkles className="h-3.5 w-3.5 text-primary" />
+                Free automated website audit
+              </div>
+
+              <h1 className="text-4xl font-bold tracking-tight md:text-6xl lg:text-7xl leading-[1.1]">
+                Turn your website into a{" "}
+                <span className="gradient-text">lead machine</span>
+              </h1>
+
+              <p className="max-w-xl text-lg leading-7 text-muted-foreground md:text-xl">
+                40+ real checks. Confirmed issues. AI-powered recommendations.
+                Get a practical audit in seconds — no fake scores, no fluff.
+              </p>
+
+              {/* Check grid */}
+              <div className="grid gap-2 sm:grid-cols-2">
+                {auditChecks.slice(0, 8).map((check) => (
+                  <div key={check} className="flex items-center gap-2.5 text-sm">
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10">
+                      <CheckCircle2 className="h-3 w-3 text-primary" />
+                    </div>
+                    <span className="text-muted-foreground">{check}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Trust indicators */}
+              <div className="flex flex-wrap gap-6 pt-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  No JS execution
                 </div>
-                <p className="text-xs leading-5 text-muted-foreground">
-                  We only scan public homepage data. No JavaScript execution, no private data.
+                <div className="flex items-center gap-1.5">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  No data stored without consent
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  100% confirmed issues
+                </div>
+              </div>
+            </div>
+
+            {/* Right: URL input card */}
+            <div className="animate-slide-in-right" style={{ animationDelay: "0.15s" }}>
+              <div className="rounded-2xl border bg-white/70 backdrop-blur-xl p-6 shadow-2xl shadow-primary/5 md:p-8">
+                <h2 className="text-lg font-semibold mb-1">Audit your website</h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Enter your URL and get instant results
+                </p>
+
+                <form className="space-y-4" onSubmit={startAudit} aria-busy={isStarting}>
+                  <div className="space-y-1.5">
+                    <label htmlFor="websiteUrl" className="text-sm font-medium">Website URL</label>
+                    <div className="relative">
+                      <Globe className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        id="websiteUrl"
+                        name="websiteUrl"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="url"
+                        placeholder="https://example.com"
+                        value={websiteUrl}
+                        onChange={(e) => setWebsiteUrl(e.target.value)}
+                        className="h-12 w-full rounded-xl border bg-white/80 pl-10 pr-3 text-base shadow-sm transition-all placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-0 hover:border-primary/30"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isStarting}
+                    className="relative h-12 w-full overflow-hidden rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isStarting ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Scanning...
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center justify-center gap-2">
+                        <Scan className="h-4 w-4" />
+                        Audit my website
+                      </span>
+                    )}
+                  </button>
+                </form>
+
+                <p className="mt-4 text-xs leading-5 text-muted-foreground text-center">
+                  We only scan public homepage data. Your email is requested after the preview.
                 </p>
               </div>
-              <button
-                type="submit"
-                disabled={isStarting}
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isStarting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Search className="h-4 w-4" aria-hidden="true" />
-                )}
-                {isStarting ? "Scanning..." : "Audit my website"}
-              </button>
-            </form>
-
-            <div className="mt-5 rounded-lg border bg-muted/30 p-3 text-sm leading-6 text-muted-foreground">
-              <p>Email is only requested after your preview so we can save your full report.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─── Results Section ────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
-        {error ? (
-          <div className="mb-6 animate-in fade-in slide-in-from-top-2 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive" role="alert">
+      {/* ─── RESULTS ──────────────────────────────────────────────── */}
+      <section ref={resultsRef} className="relative mx-auto max-w-7xl px-4 pb-20 md:px-6 lg:px-8">
+        {error && (
+          <div className="mb-6 animate-fade-in-up rounded-xl border border-red-200 bg-red-50/80 backdrop-blur-sm p-4 text-sm text-red-700" role="alert">
             {error}
           </div>
-        ) : null}
+        )}
 
         {!preview ? (
-          /* ─── Empty State ───────────────────────────────────── */
-          <div className="rounded-xl border-2 border-dashed bg-card/50 p-8 text-card-foreground">
-            <div className="mx-auto max-w-md text-center">
-              <Search className="mx-auto h-10 w-10 text-muted-foreground/50" aria-hidden="true" />
-              <h2 className="mt-4 text-xl font-semibold">Your audit preview will appear here</h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          /* Empty state */
+          <div className="mt-8 animate-fade-in-up rounded-2xl border-2 border-dashed bg-white/50 backdrop-blur-sm p-12 text-center">
+            <div className="mx-auto max-w-sm">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/5">
+                <Search className="h-8 w-8 text-primary/40" />
+              </div>
+              <h2 className="mt-5 text-xl font-semibold">Waiting for a URL</h2>
+              <p className="mt-2 text-sm text-muted-foreground leading-6">
                 Submit a public website URL above. We&apos;ll scan for 40+ signals and show you confirmed issues instantly.
               </p>
             </div>
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
-            {/* ─── Preview / Results ────────────────────────────── */}
-            <div className="space-y-4">
-              {/* Score Card */}
-              <div className="rounded-xl border bg-card p-5 text-card-foreground shadow-sm">
-                <div className="flex items-baseline justify-between gap-4">
-                  <div>
+          <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_420px]">
+            {/* ─── Left: Results ──────────────────────────────────── */}
+            <div className="space-y-5 min-w-0">
+              {/* Score hero card */}
+              <div className="animate-scale-in rounded-2xl border bg-white/80 backdrop-blur-sm p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h2 className="text-xl font-semibold">Audit preview</h2>
-                      <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground">
+                      <h2 className="text-lg font-semibold">Audit preview</h2>
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-600 ring-1 ring-emerald-200">
                         Live
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{preview.preview.normalizedDomain}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground truncate">{preview.preview.normalizedDomain}</p>
                   </div>
-                  <div className={`flex flex-col items-center rounded-lg px-4 py-2 ${scoreBgColor(preview.preview.overallScore)}`}>
-                    <div className={`text-3xl font-bold ${scoreColor(preview.preview.overallScore)}`}>
-                      {preview.preview.overallScore}
-                    </div>
-                    <div className="text-xs text-muted-foreground">/100</div>
+                  <div className={`shrink-0 flex flex-col items-center rounded-xl ${scoreStyle.bg} ${scoreStyle.ring} ring-1 px-4 py-2.5`}>
+                    <div className={`text-3xl font-bold ${scoreStyle.text}`}>{previewScore}</div>
+                    <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{scoreStyle.label}</div>
                   </div>
                 </div>
 
-                {/* Score bar */}
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted/60">
                   <div
-                    className="h-full rounded-full bg-primary transition-all duration-1000 ease-out"
-                    style={{ width: `${preview.preview.overallScore}%` }}
+                    className="score-bar h-full rounded-full bg-gradient-to-r from-primary to-primary/70"
+                    style={{ width: `${previewScore}%` }}
                   />
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
                   {preview.preview.observedSignals?.fetchStatus === "success"
-                    ? "Based on 40+ real homepage signals. All issues marked 'observed' are 100% confirmed."
-                    : "Based on available data. Some issues may be possible opportunities."}
+                    ? "Based on 40+ real homepage signals — all observed issues are 100% confirmed."
+                    : "Based on available data."}
                 </p>
               </div>
 
               {/* Issues appearing one by one */}
-              <div className="rounded-xl border bg-card p-5 text-card-foreground shadow-sm">
-                <h2 className="text-xl font-semibold">
-                  Issues found
+              <div className="animate-fade-in-up rounded-2xl border bg-white/80 backdrop-blur-sm p-6 shadow-sm" style={{ animationDelay: "0.1s" }}>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Issues found</h2>
                   {preview.preview.topIssues.length > 0 && (
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      ({Math.min(visibleIssues, preview.preview.topIssues.length)}/{preview.preview.topIssues.length})
+                    <span className="text-xs text-muted-foreground">
+                      {Math.min(visibleIssues, preview.preview.topIssues.length)}/{preview.preview.topIssues.length}
                     </span>
                   )}
-                </h2>
-                <div className="mt-4 grid gap-2">
-                  {preview.preview.topIssues.slice(0, visibleIssues).map((issue, index) => (
+                </div>
+                <div className="mt-4 grid gap-2.5">
+                  {preview.preview.topIssues.slice(0, visibleIssues).map((issue, idx) => (
                     <div
                       key={`${issue.category}-${issue.title}`}
-                      className="animate-in fade-in slide-in-from-left-2 rounded-lg border bg-background p-4"
-                      style={{ animationDelay: `${index * 100}ms` }}
+                      className="animate-fade-in-left rounded-xl border bg-white p-4 shadow-sm"
+                      style={{ animationDelay: `${idx * 0.08}s` }}
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="flex items-start gap-2">
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                          issue.observed ? "bg-emerald-100" : "bg-amber-100"
+                        }`}>
                           {issue.observed ? (
-                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" aria-hidden="true" />
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600" />
                           ) : (
-                            <div className="mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 border-yellow-400" aria-hidden="true" />
+                            <div className="h-2 w-2 rounded-full bg-amber-500" />
                           )}
-                          <div>
-                            <p className="text-sm font-medium">{issue.title}</p>
-                            <p className="mt-1 text-sm leading-6 text-muted-foreground">{issue.detail}</p>
-                          </div>
                         </div>
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                            issue.observed
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
-                          {issue.observed ? "confirmed" : "possible"}
-                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-medium">{issue.title}</p>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                              issue.observed
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}>
+                              {issue.observed ? "Confirmed" : "Possible"}
+                            </span>
+                          </div>
+                          <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{issue.detail}</p>
+                        </div>
                       </div>
                     </div>
                   ))}
                   {visibleIssues < preview.preview.topIssues.length && (
-                    <div className="flex items-center justify-center py-3">
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
-                      <span className="ml-2 text-sm text-muted-foreground">Checking more signals...</span>
+                    <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Checking more signals...
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Category Scores (animated bars) */}
-              <div className="rounded-xl border bg-card p-5 text-card-foreground shadow-sm">
-                <h2 className="text-xl font-semibold">Category breakdown</h2>
+              {/* Category scores */}
+              <div className="animate-fade-in-up rounded-2xl border bg-white/80 backdrop-blur-sm p-6 shadow-sm" style={{ animationDelay: "0.2s" }}>
+                <h2 className="text-lg font-semibold">Category breakdown</h2>
                 <div className="mt-4 grid gap-3">
-                  {Object.entries(preview.preview.categories).map(([category, score], idx) => (
-                    <div
-                      key={category}
-                      className="animate-in fade-in"
-                      style={{ animationDelay: `${idx * 80}ms` }}
-                    >
-                      <div className="flex items-center justify-between gap-4 text-sm">
-                        <span className="truncate">{category}</span>
-                        <span className={`shrink-0 font-medium ${scoreColor(score)}`}>{score}</span>
+                  {Object.entries(preview.preview.categories).map(([cat, score], idx) => {
+                    const s = getScoreStyle(score);
+                    return (
+                      <div key={cat} className="animate-fade-in-left" style={{ animationDelay: `${idx * 0.05}s` }}>
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <span className="text-sm truncate">{cat}</span>
+                          <span className={`shrink-0 text-xs font-semibold ${s.text}`}>{score}</span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted/60">
+                          <div
+                            className="score-bar h-full rounded-full bg-gradient-to-r from-primary to-primary/60"
+                            style={{ width: `${score}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary transition-all duration-700 ease-out"
-                          style={{ width: `${score}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Crawl Progress (shows during background deep crawl) */}
+              {/* Deep crawl progress */}
               {crawlStatus?.status === "crawling" && (
-                <div className="rounded-xl border bg-gradient-to-r from-blue-50 to-indigo-50 p-5 shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
+                <div className="animate-fade-in-up rounded-2xl border bg-white/80 backdrop-blur-sm p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     <div>
                       <h3 className="text-sm font-semibold">Deep crawling in progress</h3>
                       <p className="text-xs text-muted-foreground">
                         {crawlStatus.technologiesFound > 0
                           ? `Found ${crawlStatus.technologiesFound} technologies across ${crawlStatus.totalPagesCrawled} pages`
-                          : `Scanned ${crawlStatus.totalPagesCrawled} pages so far`}
+                          : `Scanned ${crawlStatus.totalPagesCrawled} pages`}
                       </p>
                     </div>
                   </div>
-                  <div className="mt-3 grid gap-1.5">
-                    {CRAWL_STEPS.map((step, i) => (
-                      <div
-                        key={step.label}
-                        className={`flex items-center gap-2 text-xs ${
-                          i < crawlStep
-                            ? "text-green-600"
-                            : i === crawlStep
-                              ? "text-primary font-medium"
-                              : "text-muted-foreground"
-                        }`}
-                      >
-                        {i < crawlStep ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                        ) : i === crawlStep ? (
-                          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
-                        ) : (
-                          <div className="h-3.5 w-3.5 shrink-0 rounded-full border-2" aria-hidden="true" />
-                        )}
-                        <span>{step.label}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    {CRAWL_STEPS.map((step, i) => {
+                      const isDone = i < crawlStep;
+                      const isCurrent = i === crawlStep;
+                      return (
+                        <div key={step.label} className={`flex items-center gap-3 text-xs ${
+                          isDone ? "text-emerald-600" : isCurrent ? "text-primary font-medium" : "text-muted-foreground/60"
+                        }`}>
+                          <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                            isDone ? "bg-emerald-100" : isCurrent ? "bg-primary/10" : "bg-muted"
+                          }`}>
+                            {isDone ? (
+                              <CheckCircle2 className="h-3 w-3" />
+                            ) : isCurrent ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <div className="h-1.5 w-1.5 rounded-full bg-current" />
+                            )}
+                          </div>
+                          <span>{step.label}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* Deep crawl complete notice */}
+              {/* Deep crawl complete */}
               {crawlStatus?.status === "complete" && !report && (
-                <div className="rounded-xl border bg-gradient-to-r from-green-50 to-emerald-50 p-4 text-sm shadow-sm">
-                  <div className="flex items-center gap-2 text-green-700">
-                    <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                    <span className="font-medium">
-                      Deep crawl complete — {crawlStatus.technologiesFound} technologies found on {crawlStatus.totalPagesCrawled} pages
-                    </span>
+                <div className="animate-fade-in-up rounded-2xl border bg-gradient-to-r from-emerald-50 to-white p-5 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-800">Deep crawl complete</p>
+                      <p className="text-xs text-muted-foreground">
+                        {crawlStatus.technologiesFound} technologies · {crawlStatus.totalPagesCrawled} pages
+                        {crawlStatus.crawlDurationMs > 0 && ` · ${(crawlStatus.crawlDurationMs / 1000).toFixed(1)}s`}
+                      </p>
+                    </div>
                   </div>
-                  {crawlStatus.crawlDurationMs > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Analyzed in {(crawlStatus.crawlDurationMs / 1000).toFixed(1)}s
-                    </p>
-                  )}
                 </div>
               )}
             </div>
 
-            {/* ─── Right Column: Email Form ─────────────────────── */}
+            {/* ─── Right: Email capture ───────────────────────────── */}
             <div className="lg:sticky lg:top-6 lg:self-start">
-              <div className="rounded-xl border bg-card p-5 text-card-foreground shadow-sm">
+              <div className="animate-scale-in rounded-2xl border bg-white/80 backdrop-blur-sm p-6 shadow-sm" style={{ animationDelay: "0.15s" }}>
                 {report ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                      <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
-                      Full report unlocked
+                  <div className="space-y-5 animate-fade-in-up">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-700">Report unlocked</p>
+                        <p className="text-xs text-muted-foreground">Your audit is ready</p>
+                      </div>
                     </div>
-                    <h2 className="text-2xl font-semibold">Report saved</h2>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      Your comprehensive audit report for <strong>{report.report.normalizedDomain}</strong> is ready.
-                      {crawlStatus?.totalPagesCrawled && crawlStatus.totalPagesCrawled > 1
-                        ? `Deep crawl analyzed ${crawlStatus.totalPagesCrawled} pages.`
-                        : ""}
-                    </p>
+
+                    <div className="rounded-xl border bg-gradient-to-br from-primary/5 to-transparent p-4">
+                      <h3 className="text-base font-semibold">{report.report.normalizedDomain}</h3>
+                      <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
+                        <span>Score: <strong className="text-foreground">{report.report.overallScore}</strong></span>
+                        {crawlStatus?.totalPagesCrawled && (
+                          <span>Pages: <strong className="text-foreground">{crawlStatus.totalPagesCrawled}</strong></span>
+                        )}
+                      </div>
+                    </div>
+
                     <a
                       href={report.reportUrl}
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98]"
                     >
-                      Open full report
-                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                      View full report
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                     </a>
                   </div>
                 ) : (
                   <form className="space-y-4" onSubmit={submitEmail} aria-busy={isSubmittingEmail}>
-                    <div className="flex items-center gap-2">
-                      <LockKeyhole className="h-5 w-5 text-primary" aria-hidden="true" />
-                      <h2 className="text-xl font-semibold">Unlock full report</h2>
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                        <LockKeyhole className="h-4 w-4 text-primary" />
+                      </div>
+                      <h2 className="text-base font-semibold">Unlock full report</h2>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-1.5 sm:col-span-2">
-                        <label htmlFor="email" className="text-sm font-medium">
-                          Email <span className="text-destructive">*</span>
+                    <div className="grid gap-3">
+                      <div className="space-y-1">
+                        <label htmlFor="email" className="text-xs font-medium">
+                          Email <span className="text-red-500">*</span>
                         </label>
                         <input
+                          ref={emailRef}
                           id="email"
                           name="email"
                           type="email"
@@ -562,85 +595,65 @@ export function AuditToolClient() {
                           spellCheck={false}
                           placeholder="you@example.com"
                           value={email}
-                          onChange={(event) => setEmail(event.target.value)}
-                          className="min-h-11 w-full rounded-md border bg-background px-3 py-2 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="h-10 w-full rounded-lg border bg-white/80 px-3 text-sm transition-all placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 hover:border-primary/30"
                           required
                         />
                       </div>
-                      <div className="space-y-1.5">
-                        <label htmlFor="name" className="text-sm font-medium">
-                          Name
-                        </label>
-                        <input
-                          id="name"
-                          name="name"
-                          type="text"
-                          autoComplete="name"
-                          value={name}
-                          onChange={(event) => setName(event.target.value)}
-                          className="min-h-11 w-full rounded-md border bg-background px-3 py-2 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label htmlFor="company" className="text-sm font-medium">
-                          Company
-                        </label>
-                        <input
-                          id="company"
-                          name="company"
-                          type="text"
-                          autoComplete="organization"
-                          value={company}
-                          onChange={(event) => setCompany(event.target.value)}
-                          className="min-h-11 w-full rounded-md border bg-background px-3 py-2 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        />
-                      </div>
-                      <div className="space-y-1.5 sm:col-span-2">
-                        <label htmlFor="phone" className="text-sm font-medium">
-                          Phone
-                        </label>
-                        <input
-                          id="phone"
-                          name="phone"
-                          type="tel"
-                          inputMode="tel"
-                          autoComplete="tel"
-                          value={phone}
-                          onChange={(event) => setPhone(event.target.value)}
-                          className="min-h-11 w-full rounded-md border bg-background px-3 py-2 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label htmlFor="name" className="text-xs font-medium">Name</label>
+                          <input
+                            id="name" name="name" type="text" autoComplete="name"
+                            value={name} onChange={(e) => setName(e.target.value)}
+                            className="h-10 w-full rounded-lg border bg-white/80 px-3 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 hover:border-primary/30"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label htmlFor="company" className="text-xs font-medium">Company</label>
+                          <input
+                            id="company" name="company" type="text" autoComplete="organization"
+                            value={company} onChange={(e) => setCompany(e.target.value)}
+                            className="h-10 w-full rounded-lg border bg-white/80 px-3 text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 hover:border-primary/30"
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <label className="flex gap-3 rounded-lg border bg-muted/30 p-3 text-sm leading-6 cursor-pointer hover:bg-muted/50 transition-colors">
+                    <label className="flex gap-3 rounded-lg border bg-muted/30 p-3 text-xs leading-5 cursor-pointer hover:bg-muted/50 transition-colors">
                       <input
                         type="checkbox"
                         checked={consentToContact}
-                        onChange={(event) => setConsentToContact(event.target.checked)}
-                        className="mt-1 h-4 w-4 shrink-0 rounded border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        onChange={(e) => setConsentToContact(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                         required
                       />
-                      <span>
+                      <span className="text-muted-foreground">
                         I agree Zybe Social can save my report and contact me about relevant services.
                       </span>
                     </label>
 
-                    <p className="text-xs leading-5 text-muted-foreground">
-                      We store only what you provide. No private data scraping.
-                    </p>
-
                     <button
                       type="submit"
                       disabled={isSubmittingEmail}
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="relative h-11 w-full overflow-hidden rounded-xl bg-primary text-sm font-medium text-primary-foreground transition-all hover:bg-primary/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isSubmittingEmail ? (
-                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Generating report...
+                        </span>
                       ) : (
-                        <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                        <span className="inline-flex items-center justify-center gap-2">
+                          <LockKeyhole className="h-3.5 w-3.5" />
+                          Unlock full report
+                        </span>
                       )}
-                      {isSubmittingEmail ? "Generating..." : "Unlock full report"}
                     </button>
+
+                    <p className="text-xs text-muted-foreground text-center leading-5">
+                      We never scrape private data. Only what you provide is stored.
+                    </p>
                   </form>
                 )}
               </div>
@@ -648,13 +661,21 @@ export function AuditToolClient() {
           </div>
         )}
       </section>
-    </main>
+
+      {/* ─── FOOTER ────────────────────────────────────────────────── */}
+      <footer className="border-t bg-white/50 backdrop-blur-sm">
+        <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-between gap-4 text-center text-xs text-muted-foreground md:flex-row">
+            <p>&copy; {new Date().getFullYear()} Zybe Social. All rights reserved.</p>
+            <p>Built with care. No fake scores. No spam.</p>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }
 
 function readApiError(data: unknown, fallback: string) {
-  if (data && typeof data === "object" && "error" in data && typeof data.error === "string") {
-    return data.error;
-  }
+  if (data && typeof data === "object" && "error" in data && typeof data.error === "string") return data.error;
   return fallback;
 }

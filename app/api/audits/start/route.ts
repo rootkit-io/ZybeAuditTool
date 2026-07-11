@@ -63,10 +63,14 @@ export async function POST(request: Request) {
     const { runBackgroundCrawl } = await import("@/lib/audits/deep-crawl");
     const repo = await import("@/lib/audits/repository");
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    runBackgroundCrawl(auditRequest.id, normalized.value.websiteUrl, normalized.value.normalizedDomain, async (id, status, data) => {
-      return repo.updateCrawlStatus(id, status as any, data as any);
-    }).catch(
+    runBackgroundCrawl(
+      auditRequest.id,
+      normalized.value.websiteUrl,
+      normalized.value.normalizedDomain,
+      async (_id: string, _status: string, _data?: unknown) => {
+        return repo.updateCrawlStatus(_id, _status as "pending" | "crawling" | "complete" | "failed", _data as Record<string, unknown> | undefined);
+      }
+    ).catch(
       (err) => {
         console.error("background_crawl_trigger_failed", {
           auditRequestId: auditRequest.id,

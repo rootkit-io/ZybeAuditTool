@@ -203,7 +203,8 @@ function computeCategoryScore(
 function buildIssues(
   observedSignals?: HomepageObservedSignals,
   usesHttps?: boolean,
-  categoryScores?: Record<AuditCategory, number>
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _categoryScores?: Record<AuditCategory, number>
 ): AuditIssue[] {
   const issues: AuditIssue[] = [];
 

@@ -1,7 +1,7 @@
 import { aiAuditReportSchema } from "./ai-report-schema";
 import { buildAiReportPrompt, validateAiReportGrounding } from "./ai-report-prompt";
 import { createAuditAiProviderFromEnv, type AuditAiProvider } from "./ai-provider";
-import type { AiAuditReport, AuditCategory, AuditReport, DeepCrawlData } from "./types";
+import type { AiAuditReport, AuditCategory, AuditReport } from "./types";
 
 export async function enhanceAuditReportWithAi(
   report: AuditReport,
@@ -53,7 +53,6 @@ export function buildDeterministicWrittenReport(report: AuditReport): AiAuditRep
 
   const hasDeepCrawl = report.deepCrawlData && report.deepCrawlData.pages.length > 1;
   const loadedTechnologies = report.deepCrawlData?.technologies || [];
-  const crawlerPages = report.deepCrawlData?.pages || [];
 
   return {
     executiveSummary:

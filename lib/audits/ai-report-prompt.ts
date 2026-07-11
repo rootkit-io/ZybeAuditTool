@@ -58,7 +58,8 @@ export function buildAiPromptPayload(report: AuditReport): AiReportPromptPayload
 
   if (report.observedSignals) {
     // Extract all observed signals (excluding failure data)
-    const { fetchStatus, failureReason, checkedAt, htmlSizeLimitBytes, ...signals } = report.observedSignals;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { fetchStatus: _fs, failureReason: _fr, checkedAt: _ca, htmlSizeLimitBytes: _hsl, ...signals } = report.observedSignals;
     Object.assign(homepageSignals, signals);
   }
 

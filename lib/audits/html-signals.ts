@@ -245,7 +245,6 @@ export function parseHomepageHtml(html: string, finalUrl: string): Partial<Homep
   // ─── CSS & JS Files ────────────────────────────────────────────────
   const cssFileCount = $('link[rel="stylesheet" i]').length;
   const jsFileCount = $('script[src]').length;
-  const inlineScripts = $("script:not([src])").length;
   const renderBlockingResources = cssFileCount + jsFileCount;
 
   // ─── Images ───────────────────────────────────────────────────────
@@ -283,10 +282,6 @@ export function parseHomepageHtml(html: string, finalUrl: string): Partial<Homep
 
   // ─── Form Detection ───────────────────────────────────────────────
   const formDetected = $("form").length > 0;
-
-  // ─── Technology Detection (from HTML) ─────────────────────────────
-  // (We just check scripts and HTML for known patterns)
-  const allHtml = html.toLowerCase();
 
   return {
     titleExists: title.length > 0,

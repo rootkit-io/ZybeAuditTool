@@ -1,6 +1,6 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
-import { parseHomepageHtml, extractTechnologiesFromHtml } from "./html-signals";
+import { parseHomepageHtml } from "./html-signals";
 import type { HomepageObservedSignals } from "./types";
 import { isPrivateOrInternalIp, normalizeWebsiteUrl } from "./url";
 
