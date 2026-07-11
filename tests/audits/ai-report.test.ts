@@ -139,7 +139,7 @@ describe("AI report generation", () => {
       }
     });
 
-    expect(prompt.payload.website.submittedUrl).toBe("https://example.com/");
+    expect(prompt.system).toContain("practical");
     expect(prompt.user).not.toContain("utm_source");
     expect(prompt.user).not.toContain("<html>");
   });

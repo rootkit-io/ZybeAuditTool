@@ -500,38 +500,9 @@ function buildIssues(
   return issues.sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
 }
 
-function buildRecommendations(preview: AuditPreview): AuditRecommendation[] {
-  const directFixes = preview.topIssues.slice(0, 4).map((issue) => ({
-    title: issue.observed ? `Fix: ${issue.title}` : `Review: ${issue.category}`,
-    detail: issue.observed
-      ? issue.detail
-      : `Possible opportunity: ask Zybe Social to review ${issue.category.toLowerCase()} against real page content before treating this as a confirmed issue.`,
-    category: issue.category,
-    label: issue.observed ? "recommended fix" : "possible opportunity"
-  })) satisfies AuditRecommendation[];
-
-  const strategicOpportunities: AuditRecommendation[] = [
-    {
-      title: "Clarify the primary conversion action",
-      detail: "Possible opportunity: make the next step obvious with one main call to action above the fold and repeated near proof sections.",
-      category: "Conversion readiness",
-      label: "possible opportunity"
-    },
-    {
-      title: "Add a helpful AI assistant",
-      detail: "Possible opportunity: an AI chatbot can qualify leads, answer service questions, or route visitors when tied to clear business rules.",
-      category: "AI/chatbot opportunity",
-      label: "possible opportunity"
-    },
-    {
-      title: "Strengthen lead capture paths",
-      detail: "Possible opportunity: align forms, calls, booking links, and follow-up copy so leads are useful without being pushy.",
-      category: "Lead generation readiness",
-      label: "possible opportunity"
-    }
-  ];
-
-  return [...directFixes, ...strategicOpportunities].slice(0, 6);
+function buildRecommendations(_preview: AuditPreview): AuditRecommendation[] {
+  // No fix suggestions - this tool focuses on detection and analysis only
+  return [];
 }
 
 function severityRank(severity: AuditIssue["severity"]) {

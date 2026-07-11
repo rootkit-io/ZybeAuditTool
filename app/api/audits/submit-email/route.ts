@@ -5,7 +5,7 @@ import { enhanceAuditReportWithAi } from "@/lib/audits/ai-report-service";
 import { checkRateLimit } from "@/lib/audits/rate-limit";
 import { getClientIp, hashIp } from "@/lib/audits/request";
 import { generateAuditReport } from "@/lib/audits/scoring";
-import type { AuditPreview, DeepCrawlData } from "@/lib/audits/types";
+import type { AuditPreview, DeepCrawlData, BusinessIntelligence } from "@/lib/audits/types";
 import { normalizeWebsiteUrl } from "@/lib/audits/url";
 import { submitEmailSchema } from "@/lib/audits/validation";
 import { validateServerEnv } from "@/lib/env";
@@ -71,10 +71,24 @@ export async function POST(request: Request) {
     const deterministicReport = generateAuditReport(normalized.value, preview?.observedSignals);
 
     // Include deep crawl data if available (may still be running)
-    const deepCrawlData = existing.deepCrawlData as DeepCrawlData | null;
+    const rawCrawlData = existing.deepCrawlData as Record<string, unknown> | null;
+    let deepCrawlData: DeepCrawlData | null = null;
+    let businessIntel: BusinessIntelligence | null = null;
 
-    if (deepCrawlData && deepCrawlData.pages.length > 0) {
-      deterministicReport.deepCrawlData = deepCrawlData;
+    if (rawCrawlData) {
+      // Extract business intel from crawl data if present
+      if (rawCrawlData._businessIntel) {
+        businessIntel = rawCrawlData._businessIntel as BusinessIntelligence;
+        delete rawCrawlData._businessIntel;
+      }
+      deepCrawlData = rawCrawlData as unknown as DeepCrawlData;
+
+      if (deepCrawlData && deepCrawlData.pages?.length > 0) {
+        deterministicReport.deepCrawlData = deepCrawlData;
+      }
+      if (businessIntel) {
+        deterministicReport.businessIntel = businessIntel;
+      }
     }
 
     // Enhance with AI (Mistral via OpenAI-compatible API)

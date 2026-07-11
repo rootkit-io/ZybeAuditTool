@@ -44,9 +44,14 @@ const report: AuditReport = {
     topIssues: [],
     categoryBreakdown: [],
     quickWins: ["Add a homepage meta description.", "Clarify the main CTA."],
-    deeperRecommendations: [],
+    competitiveLandscape: { directCompetitors: [], marketPosition: "Unknown", differentiation: "Unknown" },
+    seoNicheAnalysis: { strengths: [], gaps: [], industryStandards: [] },
+    contentAnalysis: { messagingQuality: "Basic", uniqueness: "Basic", clarity: "Basic" },
     zybeServiceOpportunities: [],
-    callToAction: "Review these items first."
+    businessProfile: {
+      summary: "Test business", industry: "General", targetAudience: "General",
+      valueProposition: "Value", mainOfferings: ["Service"], businessStage: "Established"
+    }
   },
   aiReportSource: "deterministic_fallback"
 };

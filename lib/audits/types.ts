@@ -36,46 +36,25 @@ export type HomepageObservedSignals = {
   htmlSizeBytes?: number;
   htmlSizeLimitBytes: number;
   contentType?: string;
-
-  // Title & Meta
   titleExists?: boolean;
   titleLength?: number;
   metaDescriptionExists?: boolean;
   metaDescriptionLength?: number;
-
-  // Headings
   h1Exists?: boolean;
-  headingCounts?: {
-    h1: number;
-    h2: number;
-    h3: number;
-    h4: number;
-    h5: number;
-    h6: number;
-  };
-
-  // Links
+  headingCounts?: { h1: number; h2: number; h3: number; h4: number; h5: number; h6: number; };
   internalLinkCount?: number;
   externalLinkCount?: number;
   nofollowLinkCount?: number;
   hasGenericLinkText?: boolean;
-
-  // Contact & CTA
   contactLinkDetected?: boolean;
   ctaKeywordDetected?: boolean;
   formDetected?: boolean;
   hasMailtoLinks?: boolean;
   hasTelLinks?: boolean;
-
-  // Social
   socialLinkDetected?: boolean;
-  socialProfiles?: { platform: string; url: string }[];
-
-  // SEO files
+  socialProfiles?: { platform: string; url: string; }[];
   robotTxtAvailable?: boolean;
   sitemapXmlAvailable?: boolean;
-
-  // 100% confirmed enhanced signals
   viewportMetaExists?: boolean;
   charsetDeclared?: boolean;
   faviconExists?: boolean;
@@ -95,25 +74,17 @@ export type HomepageObservedSignals = {
   imagesWithoutAlt?: number;
   schemaOrgDetected?: boolean;
   renderBlockingResources?: number;
-
-  // HTTP header signals (100% confirmed)
   usesHttps?: boolean;
   hasCompression?: boolean;
   serverHeader?: string;
   xFrameOptionsHeader?: string;
   contentSecurityPolicyHeader?: string;
   tlsVersion?: string;
-
-  // Tracking detection
   gtagDetected?: boolean;
   facebookPixelDetected?: boolean;
-
-  // Page structure
   hasNavigation?: boolean;
   hasFooter?: boolean;
   hasMainElement?: boolean;
-
-  // Failure
   failureReason?: string;
   checkedAt: string;
 };
@@ -135,9 +106,10 @@ export type AuditReport = AuditPreview & {
   aiReport?: AiAuditReport;
   aiReportSource?: "ai" | "deterministic_fallback";
   deepCrawlData?: DeepCrawlData;
+  businessIntel?: BusinessIntelligence;
 };
 
-// ─── Deep Crawl Types (Firecrawl) ─────────────────────────────────────
+// ─── Deep Crawl ─────────────────────────────────────────────────────
 
 export type DeepCrawlTechnology = {
   name: string;
@@ -165,6 +137,8 @@ export type DeepCrawledPage = {
   hasNavigation: boolean;
   technologies: DeepCrawlTechnology[];
   contentSnippet: string;
+  /** Detected page type */
+  pageType?: "homepage" | "about" | "services" | "contact" | "blog" | "pricing" | "products" | "faq" | "portfolio" | "other";
   error?: string;
 };
 
@@ -174,22 +148,59 @@ export type DeepCrawlData = {
   crawlDurationMs: number;
   totalPagesCrawled: number;
   totalPagesAttempted: number;
-  performanceSummary: {
-    avgLoadTimeMs: number;
-    fastestPage: string;
-    slowestPage: string;
-  };
+  performanceSummary: { avgLoadTimeMs: number; fastestPage: string; slowestPage: string; };
+  /** Detected page types from the crawl */
+  detectedPageTypes: string[];
+  /** Whether the site has a blog with content */
+  hasBlog: boolean;
+  /** Whether blog has recent posts (last 3 months) */
+  hasRecentBlogPosts: boolean;
+  /** Whether pricing page exists */
+  hasPricingPage: boolean;
+  /** Whether about page exists */
+  hasAboutPage: boolean;
+  /** Social presence detected */
+  socialProfiles: { platform: string; url: string; }[];
+  /** Estimated business category */
+  estimatedBusinessCategory?: string;
   errors: string[];
 };
 
-// ─── AI Report Types ──────────────────────────────────────────────────
+// ─── Business Intelligence (from web search) ────────────────────────
+
+export type BusinessIntelligence = {
+  /** What the company does (from search results) */
+  businessDescription: string;
+  /** Estimated industry/niche */
+  industry: string;
+  /** Target audience / customer profile */
+  targetAudience: string;
+  /** Main value proposition */
+  valueProposition: string;
+  /** Key products or services offered */
+  productsServices: string[];
+  /** Competitors found from search */
+  competitors: { name: string; domain: string; description: string; }[];
+  /** Estimated company size */
+  estimatedSize: "freelance" | "small" | "medium" | "large" | "enterprise" | "unknown";
+  /** Geographic reach */
+  geographicReach: string;
+  /** Business model type */
+  businessModel: string;
+  /** Whether they appear to rank for their own brand name */
+  brandSearchResults: { query: string; found: boolean; position?: number; }[];
+  /** Industry-specific SEO benchmarks */
+  industrySeoContext: string;
+};
+
+// ─── AI Report Types ────────────────────────────────────────────────
 
 export type AiAuditReportItem = {
   title: string;
   category: AuditCategory;
   observed: boolean;
   explanation: string;
-  recommendedAction: string;
+  impact: string;
 };
 
 export type AiAuditCategoryBreakdown = {
@@ -204,13 +215,44 @@ export type AiAuditServiceOpportunity = {
   relevance: string;
 };
 
+export type AiCompetitor = {
+  name: string;
+  website: string;
+  note: string;
+};
+
 export type AiAuditReport = {
+  /** What the business does */
+  businessProfile: {
+    summary: string;
+    industry: string;
+    targetAudience: string;
+    valueProposition: string;
+    mainOfferings: string[];
+    businessStage: string;
+  };
   executiveSummary: string;
   overallScoreExplanation: string;
   topIssues: AiAuditReportItem[];
   categoryBreakdown: AiAuditCategoryBreakdown[];
+  /** Competitor analysis based on search data */
+  competitiveLandscape: {
+    directCompetitors: AiCompetitor[];
+    marketPosition: string;
+    differentiation: string;
+  };
+  /** SEO analysis specific to their niche */
+  seoNicheAnalysis: {
+    strengths: string[];
+    gaps: string[];
+    industryStandards: string[];
+  };
+  /** Content and positioning analysis */
+  contentAnalysis: {
+    messagingQuality: string;
+    uniqueness: string;
+    clarity: string;
+  };
   quickWins: string[];
-  deeperRecommendations: AiAuditReportItem[];
   zybeServiceOpportunities: AiAuditServiceOpportunity[];
-  callToAction: string;
 };
