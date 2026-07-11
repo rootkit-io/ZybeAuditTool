@@ -1,7 +1,7 @@
 import { aiAuditReportSchema } from "./ai-report-schema";
 import { buildAiReportPrompt, validateAiReportGrounding } from "./ai-report-prompt";
 import { createAuditAiProviderFromEnv, type AuditAiProvider } from "./ai-provider";
-import type { AiAuditReport, AuditCategory, AuditReport, DeepCrawlData, BusinessIntelligence } from "./types";
+import type { AiAuditReport, AuditCategory, AuditReport } from "./types";
 
 export async function enhanceAuditReportWithAi(
   report: AuditReport,
@@ -42,7 +42,6 @@ export function withFallbackAiReport(report: AuditReport): AuditReport {
 
 function buildDeterministicReport(report: AuditReport): AiAuditReport {
   const observed = report.topIssues.filter(i => i.observed);
-  const possible = report.topIssues.filter(i => !i.observed);
   const weakest = Object.entries(report.categories).sort(([,a],[,b]) => a - b).slice(0, 3);
   const dc = report.deepCrawlData;
   const bi = report.businessIntel;

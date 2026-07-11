@@ -151,7 +151,6 @@ export async function getAuditReportByToken(reportToken: string) {
 
 // ─── Crawl Status Management ────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function updateCrawlStatus(
   auditRequestId: string,
   status: "pending" | "crawling" | "complete" | "failed",

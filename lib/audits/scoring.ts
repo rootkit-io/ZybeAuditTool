@@ -61,7 +61,7 @@ export function generateAuditReport(
 
   return {
     ...preview,
-    recommendations: buildRecommendations(preview),
+    recommendations: buildRecommendations(),
     generatedAt: new Date().toISOString(),
     methodologyNote:
       observedSignals?.fetchStatus === "success"
@@ -500,7 +500,7 @@ function buildIssues(
   return issues.sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
 }
 
-function buildRecommendations(_preview: AuditPreview): AuditRecommendation[] {
+function buildRecommendations(/* unused */): AuditRecommendation[] {
   // No fix suggestions - this tool focuses on detection and analysis only
   return [];
 }

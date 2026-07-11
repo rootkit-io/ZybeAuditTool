@@ -1,4 +1,4 @@
-import type { AuditReport, BusinessIntelligence, DeepCrawlData } from "./types";
+import type { AuditReport } from "./types";
 
 export type AiReportPrompt = { system: string; user: string; };
 

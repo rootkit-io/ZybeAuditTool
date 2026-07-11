@@ -26,8 +26,7 @@ function detectPageType(url: string): string {
   return "other";
 }
 
-export async function startDeepCrawl(websiteUrl: string, _normalizedDomain: string, options: FirecrawlOptions = {}): Promise<DeepCrawlData> {
-  const maxPages = 8;
+export async function startDeepCrawl(websiteUrl: string, _normalizedDomain: string, _options: FirecrawlOptions = {}): Promise<DeepCrawlData> {
   const startTime = Date.now();
 
   const homepageResult = await scrapePage(websiteUrl);
@@ -97,68 +96,112 @@ export async function startDeepCrawl(websiteUrl: string, _normalizedDomain: stri
 
 // ─── Business Intelligence Search via Firecrawl ───────────────────
 
-export async function searchBusinessIntelligence(domain: string, companyName?: string): Promise<BusinessIntelligence> {
-  const name = companyName || domain.replace(/\.[^.]+$/, "");
-  const fb = firecrawlFetch();
+/**
+ * Searches for business info using Firecrawl's v2 search API.
+ * Falls back gracefully if search is unavailable.
+ */
+export async function searchBusinessIntelligence(domain: string, _companyName?: string): Promise<BusinessIntelligence> {
+  const name = _companyName || domain.replace(/\.[^.]+$/, "").replace(/^www\./, "");
 
-  // Search for what the company does
+  // Use Firecrawl search API instead of scraping Google directly
   const [descResults, compResults, brandResults] = await Promise.allSettled([
-    fb.search(`${name} ${domain} company what they do business`),
-    fb.search(`${name} competitors alternatives`),
-    fb.search(`${name} ${domain}`)
+    firecrawlSearch(`${name} ${domain} company what they do business`),
+    firecrawlSearch(`${name} competitors alternatives`),
+    firecrawlSearch(`${name} ${domain}`)
   ]);
 
   const description = extractSearchSummary(descResults);
   const competitors = extractCompetitors(compResults);
   const brandFound = extractBrandPresence(brandResults, domain);
 
-  // Infer business details from results
   const industry = inferIndustry(description + " " + domain);
   const audience = inferAudience(description);
   const reach = inferGeographicReach(domain);
 
+  // If description is empty or contains CAPTCHA text, note it
+  const searchBlocked = !description || isCaptchaPage(description);
+  const cleanDescription = searchBlocked
+    ? `Web search results were not available for ${domain}. Business analysis is based on crawled page content only.`
+    : description;
+
   return {
-    businessDescription: description || `${domain} is a website in the ${industry} space.`,
-    industry,
-    targetAudience: audience,
-    valueProposition: extractValueProp(description),
-    productsServices: extractServices(description),
-    competitors: competitors.slice(0, 5),
-    estimatedSize: inferSize(domain, description),
-    geographicReach: reach,
-    businessModel: inferBusinessModel(description, industry),
-    brandSearchResults: brandFound,
-    industrySeoContext: getIndustrySeoContext(industry)
+    businessDescription: cleanDescription,
+    industry: searchBlocked ? "Unknown (search unavailable)" : industry,
+    targetAudience: searchBlocked ? "Could not determine (search unavailable)" : audience,
+    valueProposition: searchBlocked
+      ? `Web search unavailable for this site. Review the homepage content directly to understand the value proposition.`
+      : extractValueProp(description),
+    productsServices: searchBlocked ? [] : extractServices(description),
+    competitors: searchBlocked ? [] : competitors.slice(0, 5),
+    estimatedSize: searchBlocked ? "unknown" : inferSize(domain, description),
+    geographicReach: searchBlocked ? "Unknown" : reach,
+    businessModel: searchBlocked ? "Unknown" : inferBusinessModel(description, industry),
+    brandSearchResults: searchBlocked ? [{ query: domain, found: false }] : brandFound,
+    industrySeoContext: searchBlocked
+      ? "Search data unavailable. General SEO best practices apply."
+      : getIndustrySeoContext(industry)
   };
 }
 
-// ─── Firecrawl helpers ─────────────────────────────────────────────
+/** Detect if page content is a search engine CAPTCHA/challenge page */
+function isCaptchaPage(text: string): boolean {
+  const lower = text.toLowerCase();
+  const captchaSignals = [
+    "captcha", "unusual traffic", "automated requests",
+    "not a robot", "robot", "blocked", "please verify",
+    "detected unusual", "computer network", "terms of service"
+  ];
+  return captchaSignals.some(s => lower.includes(s));
+}
 
-function firecrawlFetch() {
+/**
+ * Uses Firecrawl's v2 search endpoint instead of scraping search engines.
+ * This avoids CAPTCHA blocks since Firecrawl handles proxy rotation/browser rendering.
+ */
+async function firecrawlSearch(query: string): Promise<string> {
   const base = FIRECRAWL_BASE_URL;
   const key = FIRECRAWL_API_KEY;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (key) headers["Authorization"] = `Bearer ${key}`;
 
-  return {
-    async search(query: string): Promise<string> {
-      try {
-        const res = await fetch(`${base}/v2/scrape`, {
-          method: "POST", headers,
-          body: JSON.stringify({
-            url: `https://www.google.com/search?q=${encodeURIComponent(query)}`,
-            formats: ["markdown"],
-            onlyMainContent: true,
-            timeout: 10000
-          }),
-          signal: AbortSignal.timeout(12000)
-        });
-        if (!res.ok) return "";
-        const data = await res.json();
-        return data?.data?.markdown || "";
-      } catch { return ""; }
+  try {
+    // Try Firecrawl v2 search endpoint first (if available)
+    const res = await fetch(`${base}/v2/search`, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        query,
+        limit: 5,
+        scrapeOptions: { formats: ["markdown"] }
+      }),
+      signal: AbortSignal.timeout(12000)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.success && data?.data?.length) {
+        // Combine search result snippets
+        return data.data.map((d: Record<string, unknown>) => String(d.description || d.markdown || "")).filter(Boolean).join("\n\n").slice(0, 3000);
+      }
     }
-  };
+
+    // Fallback: Wikipedia API (uses the first relevant term)
+    const terms = query.replace(/company what they do business/i, "").trim().split(" ").slice(0, 3);
+    const wikiTitle = terms.map(t => t.charAt(0).toUpperCase() + t.slice(1).toLowerCase()).join("_");
+    const wikiRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiTitle)}`, {
+      signal: AbortSignal.timeout(5000),
+      headers: { "User-Agent": "ZybeSocialAuditBot/1.0" }
+    });
+    if (wikiRes.ok) {
+      const wikiData = await wikiRes.json();
+      if (wikiData?.extract) {
+        return wikiData.extract.slice(0, 1500);
+      }
+    }
+  } catch {
+    // Silently fail - will return empty string
+  }
+
+  return "";
 }
 
 async function scrapePage(url: string): Promise<DeepCrawledPage | null> {
@@ -234,7 +277,7 @@ export async function runBackgroundCrawl(
     const crawlData = await startDeepCrawl(websiteUrl, normalizedDomain, { maxPages: 6, maxDepth: 1 });
 
     // Also search for business intelligence
-    const businessIntel = await searchBusinessIntelligence(normalizedDomain, crawlData.estimatedBusinessCategory);
+    const businessIntel = await searchBusinessIntelligence(normalizedDomain);
 
     await updateCrawlStatusFn(auditRequestId, "complete", {
       ...crawlData,
