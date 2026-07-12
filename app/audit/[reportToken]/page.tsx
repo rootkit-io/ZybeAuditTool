@@ -343,8 +343,11 @@ export default async function Page({ params }: Props) {
                 </div>
               )}
               <div className="space-y-1.5">
-                <a href={cfg.contactHref} className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-primary text-sm font-medium text-white transition-all hover:bg-primary/90 active:scale-[0.97]">
-                  <PhoneCall className="h-3.5 w-3.5" /> {cfg.contactLabel}
+                <a href={`tel:${cfg.phonePrimary.replace(/\s/g, "")}`} className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-primary text-sm font-medium text-white transition-all hover:bg-primary/90 active:scale-[0.97]">
+                  <PhoneCall className="h-3.5 w-3.5" /> {cfg.phonePrimary}
+                </a>
+                <a href={`tel:${cfg.phoneSecondary.replace(/\s/g, "")}`} className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border bg-background text-sm font-medium transition-all hover:bg-muted active:scale-[0.97]">
+                  <PhoneCall className="h-3.5 w-3.5" /> {cfg.phoneSecondary}
                 </a>
                 <a href={cfg.bookingUrl} className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border bg-background text-sm font-medium transition-all hover:bg-muted active:scale-[0.97]">
                   <CalendarDays className="h-3.5 w-3.5" /> Book a call

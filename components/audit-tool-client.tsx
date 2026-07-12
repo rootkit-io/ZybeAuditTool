@@ -407,8 +407,12 @@ export function AuditToolClient() {
 
       {/* ─── Footer ─────────────────────────────────────────────── */}
       <footer className="border-t bg-white/50">
-        <div className="mx-auto max-w-6xl px-4 py-6 flex items-center justify-between text-xs text-muted-foreground">
+        <div className="mx-auto max-w-6xl px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} Zybe Social</p>
+          <div className="flex items-center gap-4">
+            <a href="tel:+34657213337" className="hover:text-foreground transition-colors">+34 657 21 33 37</a>
+            <a href="tel:+919258732032" className="hover:text-foreground transition-colors">+91 92587 32032</a>
+          </div>
           <p>No fake scores. No spam.</p>
         </div>
       </footer>
