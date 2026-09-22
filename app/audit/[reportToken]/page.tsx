@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BarChart3, Building2, CalendarDays, CheckCircle2, Compass, ExternalLink, Globe, Lightbulb, PhoneCall, Search, Sparkles, Target, TrendingUp, Users, Zap } from "lucide-react";
+import { ArrowLeft, BarChart3, Building2, CheckCircle2, Compass, ExternalLink, Globe, Lightbulb, PhoneCall, Search, Sparkles, Target, TrendingUp, Users, Zap } from "lucide-react";
 import { getAuditReportByToken } from "@/lib/audits/repository";
 import type { AuditReport, DeepCrawlData } from "@/lib/audits/types";
 import { getPublicAppConfig } from "@/lib/config";
@@ -35,7 +35,7 @@ export default async function Page({ params }: Props) {
   return (
     <div className="min-h-screen bg-subtle">
       {/* Header */}
-      <header className="border-b bg-white/70 backdrop-blur-md sticky top-0 z-10">
+      <header className="border-b bg-card/70 backdrop-blur-md sticky top-0 z-10">
         <div className="mx-auto flex h-12 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-3.5 w-3.5" /> Back
@@ -46,7 +46,7 @@ export default async function Page({ params }: Props) {
 
       <div className="mx-auto max-w-6xl px-4 py-8 space-y-6">
         {/* ─── Hero Section ──────────────────────────────────────── */}
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
+        <div className="rounded-xl border bg-card p-6 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-wider text-primary">Website audit report</p>
@@ -58,7 +58,7 @@ export default async function Page({ params }: Props) {
             <div className={`shrink-0 flex flex-col items-center rounded-lg ${s.b} ${s.r} ring-1 px-4 py-2.5`}>
               <div className={`text-3xl font-bold ${s.c}`}>{report.overallScore}</div>
               <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{s.l}</div>
-              <div className="mt-2 h-1 w-16 rounded-full bg-white/60 overflow-hidden">
+              <div className="mt-2 h-1 w-16 rounded-full bg-card/60 overflow-hidden">
                 <div className={`h-full rounded-full ${s.bar}`} style={{ width: `${report.overallScore}%` }} />
               </div>
             </div>
@@ -67,7 +67,7 @@ export default async function Page({ params }: Props) {
 
         {/* ─── Business Profile ───────────────────────────────────── */}
         {ai?.businessProfile && (
-          <div className="rounded-xl border bg-white p-5 shadow-sm">
+          <div className="rounded-xl border bg-card p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <Building2 className="h-4 w-4 text-primary" />
               <h2 className="text-base font-semibold">Business profile</h2>
@@ -102,7 +102,7 @@ export default async function Page({ params }: Props) {
 
         {/* ─── Executive Summary ──────────────────────────────────── */}
         {ai && (
-          <div className="rounded-xl border bg-white p-5 shadow-sm">
+          <div className="rounded-xl border bg-card p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3 mb-2">
               <h2 className="text-base font-semibold">Executive summary</h2>
               <span className="rounded-full bg-primary/5 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary ring-1 ring-primary/10">
@@ -117,7 +117,7 @@ export default async function Page({ params }: Props) {
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           <div className="space-y-4">
             {/* ─── Issues ────────────────────────────────────────── */}
-            <div className="rounded-xl border bg-white p-5 shadow-sm">
+            <div className="rounded-xl border bg-card p-5 shadow-sm">
               <h2 className="text-base font-semibold mb-3">Issues</h2>
               <div className="space-y-2">
                 {(ai?.topIssues || report.topIssues).map((issue, i) => (
@@ -143,7 +143,7 @@ export default async function Page({ params }: Props) {
             </div>
 
             {/* ─── Categories ─────────────────────────────────────── */}
-            <div className="rounded-xl border bg-white p-5 shadow-sm">
+            <div className="rounded-xl border bg-card p-5 shadow-sm">
               <h2 className="text-base font-semibold mb-3">Category scores</h2>
               <div className="space-y-2.5">
                 {sortedCats.map(([cat, score]) => {
@@ -165,7 +165,7 @@ export default async function Page({ params }: Props) {
 
             {/* ─── Competitive Landscape ──────────────────────────── */}
             {ai?.competitiveLandscape && (
-              <div className="rounded-xl border bg-white p-5 shadow-sm">
+              <div className="rounded-xl border bg-card p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <Target className="h-4 w-4 text-primary" />
                   <h2 className="text-base font-semibold">Competitive landscape</h2>
@@ -205,7 +205,7 @@ export default async function Page({ params }: Props) {
 
             {/* ─── SEO Niche Analysis ─────────────────────────────── */}
             {ai?.seoNicheAnalysis && (
-              <div className="rounded-xl border bg-white p-5 shadow-sm">
+              <div className="rounded-xl border bg-card p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <Search className="h-4 w-4 text-primary" />
                   <h2 className="text-base font-semibold">SEO readiness</h2>
@@ -248,7 +248,7 @@ export default async function Page({ params }: Props) {
 
             {/* ─── Content Analysis ────────────────────────────────── */}
             {ai?.contentAnalysis && (
-              <div className="rounded-xl border bg-white p-5 shadow-sm">
+              <div className="rounded-xl border bg-card p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <BarChart3 className="h-4 w-4 text-primary" />
                   <h2 className="text-base font-semibold">Content & messaging</h2>
@@ -272,7 +272,7 @@ export default async function Page({ params }: Props) {
 
             {/* ─── Quick Wins ──────────────────────────────────────── */}
             {ai?.quickWins && ai.quickWins.length > 0 && (
-              <div className="rounded-xl border bg-white p-5 shadow-sm">
+              <div className="rounded-xl border bg-card p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <Zap className="h-4 w-4 text-amber-500" />
                   <h2 className="text-base font-semibold">Quick wins</h2>
@@ -290,7 +290,7 @@ export default async function Page({ params }: Props) {
 
             {/* ─── Deep Crawl ──────────────────────────────────────── */}
             {dc && dc.pages.length > 1 && (
-              <div className="rounded-xl border bg-white p-5 shadow-sm">
+              <div className="rounded-xl border bg-card p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
                   <Globe className="h-4 w-4 text-primary" />
                   <h2 className="text-base font-semibold">Deep crawl</h2>
@@ -327,7 +327,7 @@ export default async function Page({ params }: Props) {
 
           {/* ─── Sidebar ──────────────────────────────────────────── */}
           <aside className="space-y-4">
-            <div className="rounded-xl border bg-white p-5 shadow-sm">
+            <div className="rounded-xl border bg-card p-5 shadow-sm">
               <h3 className="text-sm font-semibold mb-3">Need help?</h3>
               <p className="text-sm leading-6 text-muted-foreground mb-4">
                 Zybe Social can help implement improvements, develop your site, or build AI solutions tailored to your business.
@@ -349,16 +349,13 @@ export default async function Page({ params }: Props) {
                 <a href={`tel:${cfg.phoneSecondary.replace(/\s/g, "")}`} className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border bg-background text-sm font-medium transition-all hover:bg-muted active:scale-[0.97]">
                   <PhoneCall className="h-3.5 w-3.5" /> {cfg.phoneSecondary}
                 </a>
-                <a href={cfg.bookingUrl} className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border bg-background text-sm font-medium transition-all hover:bg-muted active:scale-[0.97]">
-                  <CalendarDays className="h-3.5 w-3.5" /> Book a call
-                </a>
                 <a href={report.websiteUrl} rel="noreferrer" target="_blank" className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border bg-background text-sm font-medium transition-all hover:bg-muted active:scale-[0.97]">
                   <ExternalLink className="h-3.5 w-3.5" /> Visit site
                 </a>
               </div>
             </div>
 
-            <div className="rounded-xl border bg-white p-5 shadow-sm">
+            <div className="rounded-xl border bg-card p-5 shadow-sm">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Details</h3>
               <div className="space-y-1 text-xs text-muted-foreground">
                 <p>Domain: <span className="text-foreground">{report.normalizedDomain}</span></p>

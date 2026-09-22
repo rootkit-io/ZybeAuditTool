@@ -140,7 +140,7 @@ export function AuditToolClient() {
   return (
     <div className="min-h-screen bg-subtle">
       {/* ─── Top Navigation ─────────────────────────────────────── */}
-      <header className="border-b bg-white/70 backdrop-blur-md sticky top-0 z-20">
+      <header className="border-b bg-card/70 backdrop-blur-md sticky top-0 z-20">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 text-sm">
           <div className="flex items-center gap-2 font-semibold">
             <div className="h-6 w-6 rounded bg-primary flex items-center justify-center">
@@ -155,23 +155,18 @@ export function AuditToolClient() {
       </header>
 
       {/* ─── Hero ────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden border-b bg-white">
-        <div className="absolute inset-0 -z-10">
-          <img src="/bg.png" alt="" className="h-full w-full object-cover opacity-[0.06]" aria-hidden="true" />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/60 to-white" />
-        </div>
+      <section className="relative overflow-hidden">
         <div className="mx-auto max-w-6xl px-4 py-16 md:py-24">
           <div className="mx-auto max-w-2xl text-center">
-            <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+            <div className="mb-5 inline-flex items-center gap-1.5 rounded-full border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
               <Sparkles className="h-3 w-3 text-primary" />
-              Free — no credit card
+              Free · No spam · Results in ~30 seconds
             </div>
-            <h1 className="text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
-              Audit your website in seconds
+            <h1 className="text-4xl font-medium tracking-tight md:text-5xl lg:text-6xl leading-[1.05]">
+              See what your website is really doing for you.
             </h1>
-            <p className="mt-4 text-base leading-7 text-muted-foreground md:text-lg">
-              40+ real checks. Confirmed issues. AI-powered recommendations.
-              No fake scores, no fluff — just actionable results.
+            <p className="mt-5 text-base leading-8 text-muted-foreground md:text-lg">
+              A free, no-nonsense audit of your site&apos;s health, SEO, and business signals.
             </p>
           </div>
 
@@ -185,7 +180,7 @@ export function AuditToolClient() {
                     value={url} onChange={e => setUrl(e.target.value)}
                     placeholder="https://example.com"
                     type="url" required
-                    className="h-12 w-full rounded-lg border bg-white pl-10 pr-3 text-sm shadow-sm transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/40 hover:shadow-md placeholder:text-muted-foreground/50"
+                    className="h-12 w-full rounded-lg border bg-card pl-10 pr-3 text-sm shadow-sm transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary/40 hover:shadow-md placeholder:text-muted-foreground/50"
                   />
                 </div>
                 <button
@@ -193,14 +188,14 @@ export function AuditToolClient() {
                   className="h-12 shrink-0 rounded-lg bg-primary px-5 text-sm font-medium text-white transition-all hover:bg-primary/90 active:scale-[0.97] disabled:opacity-50 inline-flex items-center gap-1.5"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scan className="h-4 w-4" />}
-                  {loading ? "Scanning" : "Audit"}
+                  {loading ? "Scanning" : "Start my audit"}
                 </button>
               </div>
             </form>
             <div className="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-emerald-500" /> No JS execution</span>
-              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-emerald-500" /> No data stored without consent</span>
-              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-emerald-500" /> 100% confirmed issues</span>
+              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-primary" /> We only read your homepage</span>
+              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-primary" /> No login required</span>
+              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-primary" /> Nothing stored without consent</span>
             </div>
           </div>
         </div>
@@ -216,7 +211,7 @@ export function AuditToolClient() {
         )}
 
         {!preview ? (
-          <div className="animate-fade-up rounded-xl border bg-white p-12 text-center">
+          <div className="animate-fade-up rounded-xl border bg-card p-12 text-center">
             <div className="mx-auto max-w-sm">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                 <Search className="h-5 w-5 text-muted-foreground/50" />
@@ -232,7 +227,7 @@ export function AuditToolClient() {
             {/* ─── Left Column ──────────────────────────────────── */}
             <div className="space-y-4">
               {/* Score Card */}
-              <div className={`animate-scale-in rounded-xl border bg-white p-5 ${sc!.ring} ring-1`}>
+              <div className={`animate-scale-in rounded-xl border bg-card p-5 ${sc!.ring} ring-1`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -254,7 +249,7 @@ export function AuditToolClient() {
               </div>
 
               {/* Issues */}
-              <div className="animate-fade-up rounded-xl border bg-white p-5">
+              <div className="animate-fade-up rounded-xl border bg-card p-5">
                 <h2 className="text-base font-semibold">
                   Issues
                   {preview.preview.topIssues.length > 0 && (
@@ -263,7 +258,7 @@ export function AuditToolClient() {
                 </h2>
                 <div className="mt-3 space-y-2">
                   {preview.preview.topIssues.slice(0, visible).map((issue, i) => (
-                    <div key={`${issue.category}-${i}`} className="animate-slide-left rounded-lg border bg-white p-3.5 hover-card" style={{ animationDelay: `${i * 0.06}s` }}>
+                    <div key={`${issue.category}-${i}`} className="animate-slide-left rounded-lg border bg-card p-3.5 hover-card" style={{ animationDelay: `${i * 0.06}s` }}>
                       <div className="flex items-start gap-2.5">
                         <div className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${issue.observed ? "bg-emerald-100" : "bg-amber-100"}`}>
                           {issue.observed
@@ -291,7 +286,7 @@ export function AuditToolClient() {
               </div>
 
               {/* Categories */}
-              <div className="animate-fade-up rounded-xl border bg-white p-5">
+              <div className="animate-fade-up rounded-xl border bg-card p-5">
                 <h2 className="text-base font-semibold">Breakdown</h2>
                 <div className="mt-3 space-y-2.5">
                   {sortedCats.map(([cat, score], i) => {
@@ -352,7 +347,7 @@ export function AuditToolClient() {
 
             {/* ─── Right Column ─────────────────────────────────── */}
             <div className="lg:sticky lg:top-20 lg:self-start">
-              <div className="animate-scale-in rounded-xl border bg-white p-5">
+              <div className="animate-scale-in rounded-xl border bg-card p-5">
                 {report ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2.5">
@@ -379,13 +374,13 @@ export function AuditToolClient() {
                     <div className="space-y-2.5">
                       <div>
                         <input ref={emailRef} type="email" required placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)}
-                          className="h-9 w-full rounded-lg border bg-white/80 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 placeholder:text-muted-foreground/50" />
+                          className="h-9 w-full rounded-lg border bg-card/80 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 placeholder:text-muted-foreground/50" />
                       </div>
                       <div className="flex gap-2">
                         <input type="text" placeholder="Name" value={name} onChange={e => setName(e.target.value)}
-                          className="h-9 w-full rounded-lg border bg-white/80 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 placeholder:text-muted-foreground/50" />
+                          className="h-9 w-full rounded-lg border bg-card/80 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 placeholder:text-muted-foreground/50" />
                         <input type="text" placeholder="Company" value={company} onChange={e => setCompany(e.target.value)}
-                          className="h-9 w-full rounded-lg border bg-white/80 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 placeholder:text-muted-foreground/50" />
+                          className="h-9 w-full rounded-lg border bg-card/80 px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 placeholder:text-muted-foreground/50" />
                       </div>
                     </div>
                     <label className="flex items-start gap-2 text-xs leading-5 text-muted-foreground cursor-pointer">
@@ -406,7 +401,7 @@ export function AuditToolClient() {
       </section>
 
       {/* ─── Footer ─────────────────────────────────────────────── */}
-      <footer className="border-t bg-white/50">
+      <footer className="border-t bg-card/50">
         <div className="mx-auto max-w-6xl px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} Zybe Social</p>
           <div className="flex items-center gap-4">

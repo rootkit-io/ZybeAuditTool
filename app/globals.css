@@ -4,20 +4,21 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 36%;
-    --primary: 221.2 83.2% 36.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --border: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 36.3%;
-    --destructive: 0 72.2% 40.6%;
-    --radius: 0.5rem;
+    /* Zybe quiet-luxury SaaS — warm paper white canvas, near-black ink, single teal accent */
+    --background: 42 33% 97%;          /* #FAF9F6 warm paper white */
+    --foreground: 0 0% 8%;             /* #141414 near-black ink */
+    --card: 40 20% 99%;                /* near-white card on the paper canvas */
+    --card-foreground: 0 0% 8%;
+    --muted: 40 15% 94%;
+    --muted-foreground: 40 5% 40%;     /* #6B6862 muted secondary */
+    --primary: 164 88% 34%;            /* #0BA37F deep electric teal */
+    --primary-foreground: 42 33% 98%;
+    --secondary: 40 15% 94%;
+    --secondary-foreground: 0 0% 8%;
+    --border: 43 20% 90%;              /* #EAE8E1 hairline border */
+    --ring: 164 88% 34%;
+    --destructive: 9 68% 59%;          /* #E0654E coral-red */
+    --radius: 1.125rem;                /* 18px rounded corners */
   }
 
   * { border-color: hsl(var(--border)); }
@@ -29,15 +30,34 @@
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Editorial serif for headlines, humanist sans for body */
+  h1, h2, h3 {
+    font-family: var(--font-playfair), Georgia, serif;
+    letter-spacing: -0.01em;
+  }
 }
 
-/* ─── Subtle background pattern ──────────────────────────────────── */
+/* ─── Warm paper canvas: teal/mint mesh blob + faint grain ───────── */
 .bg-subtle {
-  background-image: 
-    radial-gradient(ellipse at 20% 50%, hsl(var(--primary) / 0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, hsl(var(--primary) / 0.02) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, hsl(var(--primary) / 0.01) 0%, transparent 50%);
+  position: relative;
+  background-color: hsl(var(--background));
+  background-image:
+    radial-gradient(60% 55% at 78% 12%, hsl(var(--primary) / 0.10) 0%, transparent 60%),
+    radial-gradient(50% 50% at 12% 30%, hsl(164 70% 55% / 0.08) 0%, transparent 55%),
+    radial-gradient(45% 45% at 50% 100%, hsl(var(--primary) / 0.05) 0%, transparent 60%);
 }
+/* faint grain overlay */
+.bg-subtle::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+.bg-subtle > * { position: relative; z-index: 1; }
 
 /* ─── Animations ──────────────────────────────────────────────────── */
 @keyframes fade-up {
