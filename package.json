@@ -15,7 +15,7 @@
     "@prisma/client": "6.19.3",
     "@upstash/redis": "^1.38.0",
     "cheerio": "^1.2.0",
-    "firecrawl": "^4.30.0",
+    "firecrawl": "^4.45.0",
     "lucide-react": "^0.468.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
